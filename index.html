@@ -6,83 +6,99 @@
 <title>ALGO_VISH Chart</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-:root{--bg:#0d0f14;--bg2:#13161e;--bg3:#1a1d27;--bg4:#22263a;--bd:#2a2f45;--bd2:#363b55;--t:#e2e8f0;--t2:#8892aa;--t3:#4a5270;--G:#00d085;--R:#ff4560;--B:#4c8eff;--P:#a78bfa;--O:#f59e0b;--TL:#2dd4bf;--font:'JetBrains Mono','Fira Code',monospace}
+:root{
+  --bg:#0d0f14;--bg2:#13161e;--bg3:#1a1d27;--bg4:#22263a;
+  --bd:#2a2f45;--bd2:#363b55;
+  --t:#e2e8f0;--t2:#8892aa;--t3:#4a5270;
+  --G:#00d085;--R:#ff4560;--B:#4c8eff;--P:#a78bfa;--O:#f59e0b;
+  --font:'JetBrains Mono','Fira Code',monospace
+}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
 /* TOP BAR */
-.topbar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap}
-.logo{font-weight:800;font-size:13px;color:var(--B);letter-spacing:1px;white-space:nowrap}
-.live-dot{width:7px;height:7px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);animation:pulse 1.5s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar{display:flex;align-items:center;gap:7px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap}
+.logo{font-weight:800;font-size:13px;color:var(--B);letter-spacing:1px}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--G);box-shadow:0 0 5px var(--G);animation:pulse 1.5s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
 /* Symbol search */
-.sym-wrap{position:relative}
-.sym-input{background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:5px 10px;border-radius:6px;width:190px;font-family:var(--font);font-size:12px}
-.sym-dd{position:absolute;top:calc(100% + 3px);left:0;width:300px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;max-height:280px;overflow-y:auto;z-index:999;display:none}
-.sym-dd.open{display:block}
-.sym-row{padding:7px 11px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
-.sym-row:hover{background:var(--bg4)}
-.sym-row .sn{font-weight:700;font-size:12px;color:var(--t)}
-.sym-row .sd{font-size:10px;color:var(--t2);margin-top:1px}
-.sym-row .sb{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg4);color:var(--t3)}
+.swrap{position:relative}
+.sinput{background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:5px 10px;border-radius:6px;width:180px;font-family:var(--font);font-size:12px}
+.sdd{position:absolute;top:calc(100% + 3px);left:0;width:300px;background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;max-height:280px;overflow-y:auto;z-index:999;display:none;box-shadow:0 8px 24px #00000060}
+.sdd.open{display:block}
+.srow{padding:7px 11px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
+.srow:hover{background:var(--bg4)}
+.srow .sn{font-weight:700;font-size:12px}
+.srow .sd{font-size:10px;color:var(--t2)}
+.sbadge{font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg4);color:var(--t3);white-space:nowrap}
+
 /* TF */
-.tf-bar{display:flex;gap:2px}
-.tf{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font);transition:.12s}
+.tfs{display:flex;gap:2px}
+.tf{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:4px 7px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font)}
 .tf:hover,.tf.on{background:var(--B);border-color:var(--B);color:#fff}
+
 /* Tools */
-.tools{display:flex;gap:3px;border-left:1px solid var(--bd);padding-left:9px}
-.tbtn{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font);transition:.12s;display:flex;align-items:center;gap:3px}
+.tools{display:flex;gap:3px;border-left:1px solid var(--bd);padding-left:8px}
+.tbtn{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--font);display:flex;align-items:center;gap:3px}
 .tbtn:hover{border-color:var(--bd2);color:var(--t)}
 .tbtn.on{background:var(--O)20;border-color:var(--O);color:var(--O)}
+
 /* Price */
-.pinfo{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.cprice{font-size:17px;font-weight:700}
-.chg.up{color:var(--G)} .chg.dn{color:var(--R)}
-.orb-h{background:var(--G)15;color:var(--G);border:1px solid var(--G)40;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
-.orb-l{background:var(--R)15;color:var(--R);border:1px solid var(--R)40;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
-/* Bot connection */
-.bot-status{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid var(--bd);cursor:pointer}
-.bot-status.conn{border-color:var(--G)50;color:var(--G);background:var(--G)10}
-.bot-status.disc{border-color:var(--R)50;color:var(--R);background:var(--R)10}
+.pinfo{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.cp{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.chg.up{color:var(--G)}.chg.dn{color:var(--R)}
+.orbtag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.orbH{background:var(--G)15;color:var(--G);border:1px solid var(--G)40}
+.orbL{background:var(--R)15;color:var(--R);border:1px solid var(--R)40}
+.botstatus{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600;border:1px solid var(--bd);cursor:pointer}
+.botstatus.conn{border-color:var(--G)50;color:var(--G);background:var(--G)10}
+.botstatus.disc{border-color:var(--R)50;color:var(--R);background:var(--R)10}
+
 /* LAYOUT */
 .main{display:flex;flex:1;overflow:hidden}
+
 /* SIDEBAR */
 .sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0}
 .stabs{display:flex;border-bottom:1px solid var(--bd)}
-.stab{flex:1;padding:7px 0;text-align:center;cursor:pointer;font-size:10px;color:var(--t2);border-bottom:2px solid transparent}
+.stab{flex:1;padding:7px 0;text-align:center;cursor:pointer;font-size:10px;color:var(--t2);border-bottom:2px solid transparent;transition:.15s}
 .stab.on{color:var(--B);border-bottom-color:var(--B)}
 .sbody{flex:1;overflow-y:auto;padding:7px}
+
 /* Watchlist */
-.wrow{padding:7px 9px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;border:1px solid transparent}
+.wrow{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;border:1px solid transparent}
 .wrow:hover,.wrow.on{background:var(--bg3);border-color:var(--bd)}
 .wsym{font-weight:700;font-size:11px}
 .wex{font-size:9px;padding:1px 4px;border-radius:3px;background:var(--bg4);color:var(--t3);margin-left:3px}
-.wpx{font-size:11px;text-align:right}
-.addsym{display:flex;gap:4px;margin-bottom:7px}
+.addsym{display:flex;gap:4px;margin-bottom:6px}
 .addsym input{flex:1;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:4px 7px;border-radius:5px;font-family:var(--font);font-size:11px}
-.addsym button{background:var(--B);border:none;color:#fff;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:11px}
+.addsym button{background:var(--B);border:none;color:#fff;padding:4px 8px;border-radius:5px;cursor:pointer}
+
 /* Indicators */
-.ind-row{padding:8px 9px;border-radius:7px;background:var(--bg3);margin-bottom:5px;border:1px solid var(--bd)}
-.ind-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.ind-nm{font-size:11px;font-weight:700}
+.irow{padding:7px 9px;border-radius:6px;background:var(--bg3);margin-bottom:5px;border:1px solid var(--bd)}
+.itop{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
 .ibtn{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px}
-.ibtn:hover{color:var(--t);border-color:var(--bd2)}
-.ibtn.del{color:var(--R);border-color:var(--R)40}
+.ibtn:hover{color:var(--t)}
+.ibtn.del{color:var(--R);border-color:var(--R)30}
+
 /* Alerts */
 .alrow{padding:7px 9px;border-radius:6px;margin-bottom:4px;border-left:3px solid}
-.alrow.buy{background:var(--G)08;border-color:var(--G)}
-.alrow.sell{background:var(--R)08;border-color:var(--R)}
-.alrow.fired{opacity:.45}
-.altog{width:26px;height:15px;background:var(--bd2);border-radius:8px;cursor:pointer;position:relative;border:none;transition:.2s;flex-shrink:0}
-.altog.on{background:var(--G)}
-.altog::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:.2s}
-.altog.on::after{left:13px}
-/* CHART */
+.alrow.buy{background:var(--G)06;border-color:var(--G)}
+.alrow.sell{background:var(--R)06;border-color:var(--R)}
+.alrow.fired{opacity:.4}
+.tog{width:26px;height:15px;background:var(--bd2);border-radius:8px;cursor:pointer;position:relative;border:none;flex-shrink:0}
+.tog.on{background:var(--G)}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:.2s}
+.tog.on::after{left:13px}
+
+/* CHART WRAP */
 .cwrap{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden}
 #chart{flex:1;min-height:0}
-.cxinfo{position:absolute;top:7px;left:7px;background:var(--bg2)ee;border:1px solid var(--bd);border-radius:6px;padding:5px 9px;font-size:11px;pointer-events:none;z-index:10;display:none}
-.cxinfo.show{display:block}
+.cxi{position:absolute;top:7px;left:7px;background:var(--bg2)ee;border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:11px;pointer-events:none;z-index:10;display:none}
+.cxi.show{display:flex;gap:8px}
+
 /* BOTTOM PANEL */
-.bpanel{height:120px;background:var(--bg2);border-top:1px solid var(--bd);flex-shrink:0;display:flex;flex-direction:column}
+.bpanel{height:110px;background:var(--bg2);border-top:1px solid var(--bd);flex-shrink:0;display:flex;flex-direction:column}
 .bptabs{display:flex;border-bottom:1px solid var(--bd)}
 .bptab{padding:5px 12px;font-size:11px;cursor:pointer;color:var(--t2);border-bottom:2px solid transparent}
 .bptab.on{color:var(--B);border-bottom-color:var(--B)}
@@ -92,17 +108,24 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
 .aform select,.aform input{background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:3px 7px;border-radius:5px;font-family:var(--font);font-size:11px}
 .abtn{background:var(--B);border:none;color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;font-family:var(--font)}
 .abtn.s{background:var(--R)}
+
 /* MODALS */
-.ov{position:fixed;inset:0;background:#00000088;display:none;align-items:center;justify-content:center;z-index:999}
+.ov{position:fixed;inset:0;background:#00000090;display:none;align-items:center;justify-content:center;z-index:9999}
 .ov.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--bd2);border-radius:12px;padding:18px;width:460px;max-height:80vh;overflow-y:auto}
-.modal h3{font-size:13px;font-weight:700;color:var(--t);margin-bottom:12px}
-.modal label{display:block;font-size:10px;color:var(--t2);margin:8px 0 3px}
-.modal input,.modal select,.modal textarea{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 9px;border-radius:6px;font-family:var(--font);font-size:11px}
-.modal textarea{height:100px;resize:vertical}
+.modal{background:var(--bg2);border:1px solid var(--bd2);border-radius:12px;padding:18px;width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px #00000080}
+.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.mhdr h3{font-size:13px;font-weight:700;color:var(--t)}
+.mclose{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;padding:0 4px}
+.mlabel{display:block;font-size:10px;color:var(--t2);margin:8px 0 3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.minput,.msel{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:7px 10px;border-radius:6px;font-family:var(--font);font-size:12px}
+.msel option{background:var(--bg3)}
+.mtarea{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:7px 10px;border-radius:6px;font-family:var(--font);font-size:11px;height:90px;resize:vertical}
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mbtns{display:flex;gap:7px;margin-top:14px}
-.mprimary{flex:1;background:var(--B);border:none;color:#fff;padding:8px;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;font-family:var(--font)}
-.mcancel{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:8px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-family:var(--font)}
+.mprimary{flex:1;border:none;color:#fff;padding:9px;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:var(--font)}
+.mcancel{background:transparent;border:1px solid var(--bd);color:var(--t2);padding:9px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-family:var(--font)}
+.sidebtn{padding:11px;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer;font-family:var(--font);border:2px solid;transition:.15s;width:100%}
+
 /* Utils */
 .spin{width:14px;height:14px;border:2px solid var(--bd2);border-top-color:var(--B);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -113,18 +136,18 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
 </style>
 </head>
 <body>
-<!-- TOP BAR -->
+
 <div class="topbar">
   <div class="logo">⚡ALGO_VISH</div>
-  <div class="live-dot" id="liveDot" title="Live feed"></div>
+  <div class="ldot" id="ldot"></div>
 
-  <div class="sym-wrap" id="symWrap">
-    <input class="sym-input" id="symInput" placeholder="Search symbol..." autocomplete="off"
-      oninput="filterSym(this.value)" onfocus="filterSym(this.value)" />
-    <div class="sym-dd" id="symDd"></div>
+  <div class="swrap" id="swrap">
+    <input class="sinput" id="sinput" placeholder="Search symbol..." autocomplete="off"
+      oninput="filterSym(this.value)" onfocus="filterSym(this.value||'')"/>
+    <div class="sdd" id="sdd"></div>
   </div>
 
-  <div class="tf-bar">
+  <div class="tfs">
     <button class="tf" onclick="setTF('1m')">1M</button>
     <button class="tf" onclick="setTF('3m')">3M</button>
     <button class="tf on" onclick="setTF('5m')">5M</button>
@@ -138,27 +161,23 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
 
   <div class="tools">
     <button class="tbtn" id="tH" onclick="setTool('h')">— H-Line</button>
-    <button class="tbtn" id="tL" onclick="setTool('t')">/ T-Line</button>
+    <button class="tbtn" id="tT" onclick="setTool('t')">/ T-Line</button>
     <button class="tbtn" id="tA" onclick="setTool('a')">🔔 Alert</button>
-    <button class="tbtn" onclick="clearAll()">✕ Clear</button>
+    <button class="tbtn" onclick="clearDrawings()">✕ Clear</button>
   </div>
 
   <div class="pinfo">
-    <span class="orb-h" id="orbH" style="display:none">ORB H —</span>
-    <span class="orb-l" id="orbL" style="display:none">ORB L —</span>
+    <span class="orbtag orbH" id="orbHTag" style="display:none">ORB H —</span>
+    <span class="orbtag orbL" id="orbLTag" style="display:none">ORB L —</span>
     <div>
-      <div class="cprice" id="cprice">—</div>
-      <div class="chg" id="cchg"></div>
+      <div class="cp" id="cp">—</div>
+      <div class="chg" id="chg"></div>
     </div>
-    <div class="bot-status disc" id="botStatus" onclick="openBotConfig()" title="Click to configure AlgoBot connection">
-      <span id="botDot">●</span> <span id="botTxt">Bot: Disconnected</span>
-    </div>
+    <div class="botstatus disc" id="botSt" onclick="openBotModal()" title="Click to configure">⚡ <span id="botTxt">Bot: —</span></div>
   </div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="stabs">
       <div class="stab on" onclick="showSTab('wl',this)">Watch</div>
@@ -168,7 +187,7 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
     <div class="sbody">
       <div id="stab-wl">
         <div class="addsym">
-          <input id="addIn" placeholder="BTCUSDT or RELIANCE" onkeydown="if(event.key==='Enter')addSym()" />
+          <input id="addIn" placeholder="BTCUSDT / SBIN" onkeydown="if(event.key==='Enter')addSym()"/>
           <button onclick="addSym()">+</button>
         </div>
         <div id="wlEl"></div>
@@ -179,22 +198,20 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
       </div>
       <div id="stab-al" style="display:none">
         <div id="alEl"></div>
-        <div class="note" id="noAl">No alerts. Use 🔔 tool or create below.</div>
+        <div class="note" id="noAl">No alerts. Click 🔔 on toolbar → click chart price.</div>
       </div>
     </div>
   </div>
 
-  <!-- CHART + BOTTOM -->
   <div class="cwrap">
     <div id="chart"></div>
-    <div class="cxinfo" id="cxi">
-      <span style="color:var(--B)">O </span><span id="xO">—</span>
-      <span style="color:var(--G);margin-left:8px">H </span><span id="xH">—</span>
-      <span style="color:var(--R);margin-left:8px">L </span><span id="xL">—</span>
-      <span style="color:var(--O);margin-left:8px">C </span><span id="xC">—</span>
+    <div class="cxi" id="cxi">
+      <span style="color:var(--B)">O:<b id="xO">—</b></span>
+      <span style="color:var(--G)">H:<b id="xH">—</b></span>
+      <span style="color:var(--R)">L:<b id="xL">—</b></span>
+      <span style="color:var(--O)">C:<b id="xC">—</b></span>
     </div>
 
-    <!-- BOTTOM PANEL -->
     <div class="bpanel">
       <div class="bptabs">
         <div class="bptab on" onclick="showBTab('ca',this)">🔔 Create Alert</div>
@@ -204,103 +221,167 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
       <div class="bpbody">
         <div id="bpca">
           <div class="aform">
-            <label>Symbol:</label><span id="afsym" style="color:var(--B);font-weight:700;font-size:11px">BTCUSDT</span>
-            <label>TF:</label><span id="aftf" style="color:var(--B);font-weight:700;font-size:11px">5M</span>
+            <label>Sym:</label><b id="afSym" style="color:var(--B);font-size:11px">—</b>
+            <label>TF:</label><b id="afTF" style="color:var(--B);font-size:11px">5M</b>
             <label>Type:</label>
             <select id="atype">
               <option value="buy">Buy</option><option value="sell">Sell</option>
               <option value="buy_sl">Buy SL</option><option value="buy_tgt">Buy TGT</option>
               <option value="sell_sl">Sell SL</option><option value="sell_tgt">Sell TGT</option>
             </select>
-            <label>Price:</label>
-            <input type="number" id="aprice" placeholder="0.00" step="any" style="width:90px"/>
-            <label>Note:</label><input id="anote" placeholder="optional" style="width:110px"/>
-            <button class="abtn" onclick="createAlert(false)">▲ BUY</button>
-            <button class="abtn s" onclick="createAlert(true)">▼ SELL</button>
+            <label>Price:</label><input type="number" id="aprice" step="any" style="width:80px"/>
+            <label>Qty:</label><input type="number" id="aqty" value="1" min="1" style="width:50px"/>
+            <button class="abtn" onclick="quickAlert(false)">▲ BUY</button>
+            <button class="abtn s" onclick="quickAlert(true)">▼ SELL</button>
           </div>
         </div>
-        <div id="bpfa" style="display:none">
-          <div id="firedEl" class="note">No fired alerts yet</div>
-        </div>
+        <div id="bpfa" style="display:none"><div id="firedEl" class="note">No fired alerts</div></div>
         <div id="bpbc" style="display:none">
-          <div class="aform" style="padding:4px 0">
+          <div class="aform">
             <label>AlgoBot URL:</label>
-            <input id="botUrlInput" placeholder="http://localhost:5000  or  https://algo-bot-orb.onrender.com" style="width:300px" oninput="saveBotUrlInline(this.value)" />
-            <button class="abtn" onclick="testBotConn()">🔗 Test</button>
-            <span id="botTestResult" style="font-size:10px"></span>
+            <input id="botUrlIn" style="width:280px" placeholder="https://algo-bot-orb.onrender.com" oninput="botUrl=this.value.trim().replace(/\/$/,'');localStorage.setItem('av_bot',botUrl)"/>
+            <button class="abtn" onclick="testBot()">Test</button>
+            <span id="botRes" style="font-size:10px"></span>
           </div>
-          <div id="botConnInfo" style="display:none;margin-top:6px;padding:6px 9px;border-radius:6px;font-size:10px;background:var(--G)10;border:1px solid var(--G)30;color:var(--G)">
-            ✅ Connected to AlgoBot. Fired alerts will automatically place orders via your connected broker.
-          </div>
-          <div style="font-size:10px;color:var(--t3);margin-top:5px;line-height:1.6">
-            🇮🇳 Indian alerts → Fyers broker (if logged in &amp; Master ON)<br>
-            ₿ Crypto alerts → Delta Exchange (if connected)
-          </div>
+          <div style="font-size:10px;color:var(--t3);margin-top:4px">🇮🇳 Indian → Fyers &nbsp; ₿ Crypto → Delta Exchange</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ADD INDICATOR MODAL -->
-<div class="ov" id="indModal">
+<!-- ALERT MODAL (TradingView style) -->
+<div class="ov" id="alModal">
   <div class="modal">
-    <h3>➕ Add Indicator</h3>
-    <label>Name</label><input id="iname" placeholder="e.g. My RSI" />
-    <label>Pine Script (stored for reference — signals generated on logic below)</label>
-    <textarea id="iscript" placeholder="//@version=5&#10;indicator('My Indicator', overlay=true)&#10;// paste your pine script here&#10;// Note: Built-in indicators: SMA, EMA, RSI, MACD, BB will auto-render"></textarea>
-    <label>Type</label>
-    <select id="itype">
-      <option value="sma">SMA (Simple Moving Average)</option>
-      <option value="ema">EMA (Exponential Moving Average)</option>
-      <option value="rsi">RSI (14)</option>
-      <option value="macd">MACD (12,26,9)</option>
-      <option value="bb">Bollinger Bands (20,2)</option>
-      <option value="pine">Custom Pine Script (reference only)</option>
+    <div class="mhdr">
+      <div>
+        <div style="font-size:10px;color:var(--t2);margin-bottom:2px">CREATE ALERT ON</div>
+        <h3 id="alSymTitle" style="font-size:16px;color:var(--B)">BTCUSDT</h3>
+      </div>
+      <button class="mclose" onclick="closeAlModal()">✕</button>
+    </div>
+
+    <!-- BUY / SELL selector -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <button class="sidebtn" id="alBuyBtn" onclick="setAlSide('buy')"
+        style="border-color:var(--G);background:var(--G);color:#fff">▲ BUY</button>
+      <button class="sidebtn" id="alSellBtn" onclick="setAlSide('sell')"
+        style="border-color:var(--R)30;background:transparent;color:var(--R)">▼ SELL</button>
+    </div>
+
+    <!-- Condition row -->
+    <label class="mlabel">Condition</label>
+    <select class="msel" id="alCondition" style="margin-bottom:6px">
+      <option value="cross">Price crosses level</option>
+      <option value="above">Price goes above</option>
+      <option value="below">Price goes below</option>
     </select>
-    <label>Period (for SMA/EMA)</label><input id="iperiod" type="number" value="20" />
-    <label>Color</label><input type="color" id="icolor" value="#a78bfa" style="width:50px;height:28px;padding:2px" />
+
+    <!-- Indicator row -->
+    <label class="mlabel">Indicator (optional)</label>
+    <select class="msel" id="alIndicator" style="margin-bottom:6px">
+      <option value="">None — Price based</option>
+    </select>
+
+    <div class="mrow" style="margin-bottom:6px">
+      <div>
+        <label class="mlabel">Alert Type</label>
+        <select class="msel" id="alType">
+          <option value="buy">Buy Entry</option>
+          <option value="buy_tgt">Buy Target</option>
+          <option value="buy_sl">Buy Stoploss</option>
+          <option value="sell">Sell Entry</option>
+          <option value="sell_tgt">Sell Target</option>
+          <option value="sell_sl">Sell Stoploss</option>
+        </select>
+      </div>
+      <div>
+        <label class="mlabel">Interval</label>
+        <select class="msel" id="alTFSel">
+          <option value="same">Same as chart</option>
+          <option value="1m">1 Minute</option>
+          <option value="5m">5 Minutes</option>
+          <option value="15m">15 Minutes</option>
+          <option value="1h">1 Hour</option>
+          <option value="1d">1 Day</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mrow" style="margin-bottom:6px">
+      <div>
+        <label class="mlabel">Price</label>
+        <input class="minput" type="number" id="alPriceIn" step="any"/>
+      </div>
+      <div>
+        <label class="mlabel">Quantity</label>
+        <input class="minput" type="number" id="alQtyIn" value="1" min="1"/>
+      </div>
+    </div>
+
+    <div class="mrow" style="margin-bottom:6px">
+      <div>
+        <label class="mlabel">Order Type</label>
+        <select class="msel" id="alOrdType">
+          <option value="MARKET">Market Order</option>
+          <option value="LIMIT">Limit Order</option>
+        </select>
+      </div>
+      <div>
+        <label class="mlabel">Trigger</label>
+        <select class="msel" id="alTrigger">
+          <option value="once">Once only</option>
+          <option value="every">Every time</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="mlabel">Message / Note</label>
+    <input class="minput" id="alNote" placeholder="e.g. ORB breakout signal" style="margin-bottom:8px"/>
+
+    <div style="padding:7px 9px;border-radius:6px;background:var(--B)08;border:1px solid var(--B)20;font-size:10px;color:var(--B);margin-bottom:10px">
+      🤖 When this alert fires → AlgoBot automatically places the order on your connected broker
+    </div>
+
     <div class="mbtns">
-      <button class="mcancel" onclick="closeIndModal()">Cancel</button>
-      <button class="mprimary" onclick="saveInd()">Save Indicator</button>
+      <button class="mcancel" onclick="closeAlModal()">Cancel</button>
+      <button class="mprimary" id="alOkBtn" onclick="confirmAl()" style="background:var(--G)">Create Alert</button>
     </div>
   </div>
 </div>
 
-<!-- ALERT LINE MODAL -->
-<div class="ov" id="alModal">
-  <div class="modal" style="width:420px">
-    <h3>🔔 Set Alert at <span id="alPrice" style="color:var(--O)">—</span></h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <button id="alBuyBtn" onclick="setAlSide('buy')" style="padding:12px;border-radius:8px;border:2px solid var(--G);background:var(--G);color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:var(--font)">▲ BUY</button>
-      <button id="alSellBtn" onclick="setAlSide('sell')" style="padding:12px;border-radius:8px;border:2px solid var(--R)20;background:transparent;color:var(--R);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--font)">▼ SELL</button>
+<!-- INDICATOR MODAL -->
+<div class="ov" id="indModal">
+  <div class="modal">
+    <div class="mhdr">
+      <h3>➕ Add Indicator</h3>
+      <button class="mclose" onclick="closeIndModal()">✕</button>
     </div>
-    <label>Alert Type</label>
-    <select id="alType" style="margin-bottom:6px">
-      <option value="buy">Buy Entry</option>
-      <option value="buy_tgt">Buy Target</option>
-      <option value="buy_sl">Buy Stoploss</option>
-      <option value="sell">Sell Entry</option>
-      <option value="sell_tgt">Sell Target</option>
-      <option value="sell_sl">Sell Stoploss</option>
+    <label class="mlabel">Name</label>
+    <input class="minput" id="iname" placeholder="e.g. My RSI Strategy" style="margin-bottom:6px"/>
+    <label class="mlabel">Built-in Type</label>
+    <select class="msel" id="itype" style="margin-bottom:6px">
+      <option value="sma">SMA — Simple Moving Average</option>
+      <option value="ema">EMA — Exponential Moving Average</option>
+      <option value="bb">Bollinger Bands (20, 2)</option>
+      <option value="vwap">VWAP</option>
+      <option value="pine">Custom Pine Script (stored as reference)</option>
     </select>
-    <label>Price</label>
-    <input type="number" id="alPriceInput" step="any" style="margin-bottom:6px" />
-    <label>Quantity</label>
-    <input type="number" id="alQty" value="1" min="1" style="margin-bottom:6px" />
-    <label>Order Type</label>
-    <select id="alOrdType" style="margin-bottom:6px">
-      <option value="MARKET">Market Order</option>
-      <option value="LIMIT">Limit Order</option>
-    </select>
-    <label>Note (optional)</label>
-    <input id="alNote" placeholder="e.g. ORB breakout" style="margin-bottom:6px" />
-    <div style="padding:8px 10px;border-radius:7px;background:var(--B)10;border:1px solid var(--B)30;font-size:10px;color:var(--B);margin-bottom:10px">
-      🤖 When price hits this level → AlgoBot places order via connected broker automatically
+    <div class="mrow" style="margin-bottom:6px">
+      <div>
+        <label class="mlabel">Period</label>
+        <input class="minput" type="number" id="iperiod" value="20"/>
+      </div>
+      <div>
+        <label class="mlabel">Color</label>
+        <input type="color" id="icolor" value="#a78bfa" style="width:100%;height:34px;border-radius:6px;border:1px solid var(--bd);background:var(--bg3);cursor:pointer;padding:2px"/>
+      </div>
     </div>
+    <label class="mlabel">Pine Script (paste for reference — logic stored)</label>
+    <textarea class="mtarea" id="iscript" placeholder="//@version=5&#10;indicator('My Indicator', overlay=true)&#10;// Paste your Pine Script here&#10;// Built-in types (SMA/EMA/BB/VWAP) will render on chart&#10;// Custom Pine Script is stored as reference for alert conditions"></textarea>
     <div class="mbtns">
-      <button class="mcancel" onclick="closeAlModal()">Cancel</button>
-      <button class="mprimary" id="alConfirmBtn" onclick="confirmAl()" style="background:var(--G)">✅ Set Alert</button>
+      <button class="mcancel" onclick="closeIndModal()">Cancel</button>
+      <button class="mprimary" onclick="saveInd()" style="background:var(--P)">Save Indicator</button>
     </div>
   </div>
 </div>
@@ -308,127 +389,183 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
 <!-- BOT CONFIG MODAL -->
 <div class="ov" id="botModal">
   <div class="modal">
-    <h3>🤖 Connect to AlgoBot</h3>
-    <label>AlgoBot Server URL</label>
-    <input id="botUrlM" placeholder="http://localhost:5000" />
-    <div style="font-size:10px;color:var(--t2);margin-top:6px;line-height:1.6">
-      This links your chart alerts to AlgoBot. When an alert fires, it sends a signal to AlgoBot which places the order via your connected broker (Fyers/Delta Exchange).<br><br>
-      <b style="color:var(--B)">For local bot:</b> http://localhost:5000<br>
-      <b style="color:var(--B)">For Render:</b> https://algo-bot-orb.onrender.com
+    <div class="mhdr">
+      <h3>🤖 Connect AlgoBot</h3>
+      <button class="mclose" onclick="document.getElementById('botModal').classList.remove('open')">✕</button>
+    </div>
+    <label class="mlabel">AlgoBot Server URL</label>
+    <input class="minput" id="botUrlM" placeholder="https://algo-bot-orb.onrender.com" style="margin-bottom:8px"/>
+    <div style="font-size:10px;color:var(--t2);line-height:1.7;margin-bottom:10px">
+      <b style="color:var(--B)">Local:</b> http://localhost:5000<br>
+      <b style="color:var(--B)">Render:</b> https://algo-bot-orb.onrender.com<br><br>
+      Fired alerts send signals to AlgoBot → orders via Fyers (Indian) or Delta Exchange (Crypto)
     </div>
     <div class="mbtns">
       <button class="mcancel" onclick="document.getElementById('botModal').classList.remove('open')">Cancel</button>
-      <button class="mprimary" onclick="saveBotConfig()">Save & Connect</button>
+      <button class="mprimary" onclick="saveBotConfig()" style="background:var(--B)">Save & Connect</button>
     </div>
   </div>
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// CONFIG & STATE
-// ══════════════════════════════════════════════════════════
-let chart, cs, vs; // chart, candleSeries, volumeSeries
-let indSeries = {}; // indicatorId → series
-let curSym    = 'BTCUSDT';
-let curTF     = '5m';
-let curTool   = null;
-let allCandles= [];
-let drawings  = [];
-let pricelines= {}; // alertId → priceLine
-let liveWs    = null;
-let tickTimer = null;
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let chart, cs, vs;
+let indSeries = {};
+let curSym = 'BTCUSDT', curTF = '5m', curTool = null;
+let allCandles = [], drawings = [], plines = {};
+let liveWs = null, tickInterval = null;
+let openPrice = 0;
 let orbH = null, orbL = null;
-let pendingPrice = null;
+let pendingPrice = null, alSide = 'buy';
+
+function ls(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
+function ss(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
 let watchlist  = ls('av_wl')   || ['BTCUSDT','ETHUSDT','SOLUSDT','RELIANCE.NS','SBIN.NS'];
 let indicators = ls('av_ind')  || [];
 let alerts     = ls('av_al')   || [];
 let fired      = ls('av_fired')|| [];
 let botUrl     = localStorage.getItem('av_bot') || '';
-let botOk      = false;
 
-function ls(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
-function ss(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
-
-// ══════════════════════════════════════════════════════════
-// SYMBOL DATABASE
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// SYMBOL DATABASE — 50 NSE + 200+ Crypto
+// ═══════════════════════════════════════════════════════════════
 const NSE = [
-  ['RELIANCE.NS','RELIANCE','Reliance Industries','NSE'],
-  ['TCS.NS','TCS','Tata Consultancy Services','NSE'],
-  ['HDFCBANK.NS','HDFCBANK','HDFC Bank','NSE'],
-  ['INFY.NS','INFY','Infosys','NSE'],
-  ['ICICIBANK.NS','ICICIBANK','ICICI Bank','NSE'],
-  ['SBIN.NS','SBIN','State Bank of India','NSE'],
-  ['TATAMOTORS.NS','TATAMOTORS','Tata Motors','NSE'],
-  ['BAJFINANCE.NS','BAJFINANCE','Bajaj Finance','NSE'],
-  ['JUBLFOOD.NS','JUBLFOOD','Jubilant FoodWorks','NSE'],
-  ['ZOMATO.NS','ZOMATO','Zomato','NSE'],
-  ['ADANIPORTS.NS','ADANIPORTS','Adani Ports','NSE'],
-  ['AXISBANK.NS','AXISBANK','Axis Bank','NSE'],
-  ['SUNPHARMA.NS','SUNPHARMA','Sun Pharma','NSE'],
-  ['BEL.NS','BEL','Bharat Electronics','NSE'],
-  ['HAL.NS','HAL','Hindustan Aeronautics','NSE'],
-  ['IRCTC.NS','IRCTC','IRCTC','NSE'],
-  ['WIPRO.NS','WIPRO','Wipro','NSE'],
-  ['HCLTECH.NS','HCLTECH','HCL Technologies','NSE'],
-  ['TATASTEEL.NS','TATASTEEL','Tata Steel','NSE'],
-  ['KOTAKBANK.NS','KOTAKBANK','Kotak Mahindra Bank','NSE'],
-  ['LT.NS','LT','Larsen & Toubro','NSE'],
-  ['BHARTIARTL.NS','BHARTIARTL','Airtel','NSE'],
-  ['ITC.NS','ITC','ITC Limited','NSE'],
-  ['NTPC.NS','NTPC','NTPC','NSE'],
-  ['POWERGRID.NS','POWERGRID','Power Grid','NSE'],
-  ['ONGC.NS','ONGC','ONGC','NSE'],
-  ['COALINDIA.NS','COALINDIA','Coal India','NSE'],
-  ['DRREDDY.NS','DRREDDY',"Dr Reddy's",'NSE'],
-  ['CIPLA.NS','CIPLA','Cipla','NSE'],
-  ['TITAN.NS','TITAN','Titan Company','NSE'],
-  ['TRENT.NS','TRENT','Trent','NSE'],
-  ['DMART.NS','DMART','Avenue Supermarts','NSE'],
-  ['APOLLOHOSP.NS','APOLLOHOSP','Apollo Hospitals','NSE'],
-  ['HINDUNILVR.NS','HINDUNILVR','HUL','NSE'],
-  ['NESTLEIND.NS','NESTLEIND','Nestle India','NSE'],
-  ['MARUTI.NS','MARUTI','Maruti Suzuki','NSE'],
-  ['TECHM.NS','TECHM','Tech Mahindra','NSE'],
-  ['DLF.NS','DLF','DLF','NSE'],
-  ['BANKBARODA.NS','BANKBARODA','Bank of Baroda','NSE'],
-  ['PNB.NS','PNB','Punjab National Bank','NSE'],
-  ['TATAPOWER.NS','TATAPOWER','Tata Power','NSE'],
-  ['VEDL.NS','VEDL','Vedanta','NSE'],
-  ['HINDALCO.NS','HINDALCO','Hindalco','NSE'],
-  ['JSWSTEEL.NS','JSWSTEEL','JSW Steel','NSE'],
-  ['GAIL.NS','GAIL','GAIL','NSE'],
-  ['IOC.NS','IOC','Indian Oil','NSE'],
-  ['BPCL.NS','BPCL','BPCL','NSE'],
-  ['HDFCLIFE.NS','HDFCLIFE','HDFC Life','NSE'],
-  ['SBICARD.NS','SBICARD','SBI Cards','NSE'],
-  ['PAYTM.NS','PAYTM','Paytm','NSE'],
-].map(([s,l,n,e])=>({s,l,n,e,type:'indian'}));
+  // NIFTY 50
+  ['RELIANCE.NS','RELIANCE','Reliance Industries'],
+  ['TCS.NS','TCS','Tata Consultancy Services'],
+  ['HDFCBANK.NS','HDFCBANK','HDFC Bank'],
+  ['INFY.NS','INFY','Infosys'],
+  ['ICICIBANK.NS','ICICIBANK','ICICI Bank'],
+  ['SBIN.NS','SBIN','State Bank of India'],
+  ['KOTAKBANK.NS','KOTAKBANK','Kotak Mahindra Bank'],
+  ['AXISBANK.NS','AXISBANK','Axis Bank'],
+  ['LT.NS','LT','Larsen & Toubro'],
+  ['BAJFINANCE.NS','BAJFINANCE','Bajaj Finance'],
+  ['BHARTIARTL.NS','BHARTIARTL','Airtel'],
+  ['WIPRO.NS','WIPRO','Wipro'],
+  ['HCLTECH.NS','HCLTECH','HCL Technologies'],
+  ['TECHM.NS','TECHM','Tech Mahindra'],
+  ['MARUTI.NS','MARUTI','Maruti Suzuki'],
+  ['TATAMOTORS.NS','TATAMOTORS','Tata Motors'],
+  ['TATASTEEL.NS','TATASTEEL','Tata Steel'],
+  ['SUNPHARMA.NS','SUNPHARMA','Sun Pharma'],
+  ['DRREDDY.NS','DRREDDY',"Dr Reddy's"],
+  ['CIPLA.NS','CIPLA','Cipla'],
+  ['DIVISLAB.NS','DIVISLAB',"Divi's Lab"],
+  ['ITC.NS','ITC','ITC Limited'],
+  ['HINDUNILVR.NS','HINDUNILVR','Hindustan Unilever'],
+  ['NESTLEIND.NS','NESTLEIND','Nestle India'],
+  ['TITAN.NS','TITAN','Titan Company'],
+  ['TRENT.NS','TRENT','Trent'],
+  ['DMART.NS','DMART','Avenue Supermarts'],
+  ['APOLLOHOSP.NS','APOLLOHOSP','Apollo Hospitals'],
+  ['ADANIPORTS.NS','ADANIPORTS','Adani Ports'],
+  ['ADANIENT.NS','ADANIENT','Adani Enterprises'],
+  ['ADANIGREEN.NS','ADANIGREEN','Adani Green'],
+  ['ADANIPOWER.NS','ADANIPOWER','Adani Power'],
+  ['ONGC.NS','ONGC','ONGC'],
+  ['IOC.NS','IOC','Indian Oil'],
+  ['BPCL.NS','BPCL','BPCL'],
+  ['GAIL.NS','GAIL','GAIL'],
+  ['COALINDIA.NS','COALINDIA','Coal India'],
+  ['NTPC.NS','NTPC','NTPC'],
+  ['POWERGRID.NS','POWERGRID','Power Grid'],
+  ['TATAPOWER.NS','TATAPOWER','Tata Power'],
+  ['BEL.NS','BEL','Bharat Electronics'],
+  ['HAL.NS','HAL','Hindustan Aeronautics'],
+  ['IRCTC.NS','IRCTC','IRCTC'],
+  ['IRFC.NS','IRFC','Indian Railway Finance'],
+  ['ZOMATO.NS','ZOMATO','Zomato'],
+  ['PAYTM.NS','PAYTM','Paytm'],
+  ['NYKAA.NS','NYKAA','FSN E-Commerce (Nykaa)'],
+  ['POLICYBZR.NS','POLICYBZR','PB Fintech (PolicyBazaar)'],
+  ['JUBLFOOD.NS','JUBLFOOD','Jubilant FoodWorks'],
+  ['HDFCLIFE.NS','HDFCLIFE','HDFC Life'],
+  ['SBICARD.NS','SBICARD','SBI Cards'],
+  ['ICICIPRULI.NS','ICICIPRULI','ICICI Prudential Life'],
+  ['BAJAJFINSV.NS','BAJAJFINSV','Bajaj Finserv'],
+  ['BAJAJ-AUTO.NS','BAJAJ-AUTO','Bajaj Auto'],
+  ['HEROMOTOCO.NS','HEROMOTOCO','Hero MotoCorp'],
+  ['EICHERMOT.NS','EICHERMOT','Eicher Motors'],
+  ['M&M.NS','M&M','Mahindra & Mahindra'],
+  ['JSWSTEEL.NS','JSWSTEEL','JSW Steel'],
+  ['HINDALCO.NS','HINDALCO','Hindalco'],
+  ['VEDL.NS','VEDL','Vedanta'],
+  ['SAIL.NS','SAIL','Steel Authority'],
+  ['DLF.NS','DLF','DLF'],
+  ['GODREJPROP.NS','GODREJPROP','Godrej Properties'],
+  ['OBEROIRLTY.NS','OBEROIRLTY','Oberoi Realty'],
+  ['BANKBARODA.NS','BANKBARODA','Bank of Baroda'],
+  ['PNB.NS','PNB','Punjab National Bank'],
+  ['CANBK.NS','CANBK','Canara Bank'],
+  ['UNIONBANK.NS','UNIONBANK','Union Bank'],
+  ['IDFCFIRSTB.NS','IDFCFIRSTB','IDFC First Bank'],
+  ['FEDERALBNK.NS','FEDERALBNK','Federal Bank'],
+  ['RBLBANK.NS','RBLBANK','RBL Bank'],
+  ['BANDHANBNK.NS','BANDHANBNK','Bandhan Bank'],
+  ['INDUSINDBK.NS','INDUSINDBK','IndusInd Bank'],
+  ['AUBANK.NS','AUBANK','AU Small Finance Bank'],
+  ['MUTHOOTFIN.NS','MUTHOOTFIN','Muthoot Finance'],
+  ['CHOLAFIN.NS','CHOLAFIN','Cholamandalam Finance'],
+  ['LICHSGFIN.NS','LICHSGFIN','LIC Housing Finance'],
+  ['RECLTD.NS','RECLTD','REC Limited'],
+  ['PFC.NS','PFC','Power Finance Corp'],
+  ['IREDA.NS','IREDA','IREDA'],
+  ['RVNL.NS','RVNL','Rail Vikas Nigam'],
+  ['TITAGARH.NS','TITAGARH','Titagarh Rail Systems'],
+  ['CESC.NS','CESC','CESC'],
+  ['GLENMARK.NS','GLENMARK','Glenmark Pharma'],
+  ['LUPIN.NS','LUPIN','Lupin'],
+  ['AUROPHARMA.NS','AUROPHARMA','Aurobindo Pharma'],
+  ['TORNTPHARM.NS','TORNTPHARM','Torrent Pharma'],
+  ['BIOCON.NS','BIOCON','Biocon'],
+  ['HINDPETRO.NS','HINDPETRO','HPCL'],
+  ['MRF.NS','MRF','MRF'],
+  ['BALKRISIND.NS','BALKRISIND','Balkrishna Industries'],
+  ['PERSISTENT.NS','PERSISTENT','Persistent Systems'],
+  ['MPHASIS.NS','MPHASIS','Mphasis'],
+  ['LTIM.NS','LTIM','LTIMindtree'],
+  ['COFORGE.NS','COFORGE','Coforge'],
+  ['KPITTECH.NS','KPITTECH','KPIT Technologies'],
+  ['TATACOMM.NS','TATACOMM','Tata Communications'],
+  ['DIXON.NS','DIXON','Dixon Technologies'],
+  ['KAYNES.NS','KAYNES','Kaynes Technology'],
+  ['AMBER.NS','AMBER','Amber Enterprises'],
+].map(([s,l,n])=>({s,l,n,e:'NSE',t:'indian'}));
 
-const CRYPTO = [
+// Crypto — USDT pairs
+const CRYPTOS = [
   'BTC','ETH','BNB','XRP','SOL','ADA','DOGE','AVAX','DOT','MATIC',
   'LINK','UNI','ATOM','LTC','BCH','XLM','ALGO','VET','THETA','FIL',
   'TRX','EOS','NEO','XMR','DASH','ZEC','AAVE','COMP','YFI','SNX',
   'SUSHI','1INCH','CRV','BAL','REN','UMA','BAND','KNC','ZRX','LRC',
-  'ENJ','SAND','MANA','AXS','CHZ','HOT','BAT','OMG','GRT','NEAR',
-  'FTM','ONE','HBAR','IOTA','WAVES','QTUM','ICX','ZIL','WAN','STMX',
-].flatMap(b=>['USDT','BTC'].map(q=>({
-  s:`${b}${q}`, l:`${b}${q}`, n:`${b}/${q}`, e:'BINANCE', type:'crypto'
-})));
+  'ENJ','SAND','MANA','AXS','CHZ','BAT','OMG','GRT','NEAR','FTM',
+  'ONE','HBAR','IOTA','WAVES','QTUM','ICX','ZIL','HOT','STMX','WIN',
+  'SLP','ILV','GALA','ALICE','RUNE','LUNA','LUNC','APT','ARB','OP',
+  'SUI','SEI','INJ','TIA','BLUR','WLD','PENDLE','PYTH','JTO','MEME',
+  'ORDI','SATS','WIF','BOME','POPCAT','DOGS','NOT','HMSTR','CATI',
+  'PEPE','FLOKI','SHIB','BONK','WEN','SLERF','PONKE','MEW',
+];
+const CRYPTO_SYMS = CRYPTOS.map(b=>({
+  s:`${b}USDT`,l:`${b}USDT`,n:`${b}/USDT Perpetual`,e:'BINANCE',t:'crypto'
+}));
 
-const ALL_SYMS = [...NSE, ...CRYPTO];
+const ALL_SYMS = [...NSE, ...CRYPTO_SYMS];
 
-function isIndian(s){ return s.endsWith('.NS')||s.endsWith('.BSE'); }
+function isIndian(s){return s.endsWith('.NS')||s.endsWith('.BSE');}
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // CHART INIT
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function initChart(){
   const el = document.getElementById('chart');
-  chart = LightweightCharts.createChart(el,{
+  chart = LightweightCharts.createChart(el, {
     layout:{background:{color:'#0d0f14'},textColor:'#8892aa'},
-    grid:{vertLines:{color:'#1a1d27'},horzLines:{color:'#1a1d27'}},
+    grid:{vertLines:{color:'#1a1d2780'},horzLines:{color:'#1a1d2780'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#2a2f45'},
     timeScale:{borderColor:'#2a2f45',timeVisible:true,secondsVisible:false},
@@ -441,7 +578,7 @@ function initChart(){
   });
 
   vs = chart.addHistogramSeries({
-    priceFormat:{type:'volume'},priceScaleId:'',
+    priceFormat:{type:'volume'},priceScaleId:'vol',
     scaleMargins:{top:.85,bottom:0},
   });
 
@@ -457,68 +594,72 @@ function initChart(){
     document.getElementById('xC').textContent=f(d.close);
   });
 
+  // Single click for drawing/alert — use logical price from crosshair
+  let lastCrosshairPrice = null;
+  chart.subscribeCrosshairMove(p=>{
+    if(p.point&&cs){
+      lastCrosshairPrice = cs.coordinateToPrice(p.point.y);
+    }
+  });
+
   chart.subscribeClick(p=>{
     if(!curTool)return;
-    // Get price from crosshair data first, fallback to coordinate
-    let price = null;
-    if(p.seriesData && p.seriesData.get(cs)){
-      price = p.seriesData.get(cs).close;
-    }
-    if(!price && p.point){
-      price = cs.coordinateToPrice(p.point.y);
-    }
+    const price = lastCrosshairPrice;
     if(!price)return;
-    price = parseFloat(price.toFixed(4));
-    if(curTool==='h'){ drawHLine(price); setTool(null); }
-    else if(curTool==='t'){ drawHLine(price); setTool(null); }
+    const rounded = parseFloat(price.toFixed(isIndian(curSym)?2:4));
+    if(curTool==='h'){drawHLine(rounded);setTool(null);}
+    else if(curTool==='t'){drawHLine(rounded);setTool(null);}
     else if(curTool==='a'){
-      pendingPrice = price;
-      openAlModal(price);
-      setTool(null); // auto-reset tool after click
+      pendingPrice=rounded;
+      openAlModal(rounded);
+      setTool(null);
     }
   });
 
   new ResizeObserver(()=>{
-    const h = el.parentElement.clientHeight - 120;
+    const h=el.parentElement.clientHeight-110;
     chart.applyOptions({width:el.clientWidth,height:Math.max(200,h)});
   }).observe(el.parentElement);
 }
 
-const f = n => n>=1000?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
+const f=n=>{
+  if(n===null||n===undefined)return'—';
+  return n>=10000?n.toFixed(2):n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
+};
 
-// ══════════════════════════════════════════════════════════
-// DATA LOADING
-// ══════════════════════════════════════════════════════════
-const BN_IV = {'1m':'1m','3m':'3m','5m':'5m','10m':'5m','15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d'};
-const YH_IV = {'1m':'1m','3m':'2m','5m':'5m','10m':'5m','15m':'15m','30m':'30m','1h':'60m','4h':'60m','1d':'1d'};
-const YH_RG = {'1m':'1d','3m':'2d','5m':'5d','10m':'5d','15m':'5d','30m':'30d','1h':'60d','4h':'60d','1d':'1y'};
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+const BN_IV={'1m':'1m','3m':'3m','5m':'5m','10m':'5m','15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d'};
+const YH_IV={'1m':'1m','3m':'2m','5m':'5m','10m':'5m','15m':'15m','30m':'30m','1h':'60m','4h':'60m','1d':'1d'};
+const YH_RG={'1m':'1d','3m':'2d','5m':'5d','10m':'5d','15m':'5d','30m':'30d','1h':'60d','4h':'60d','1d':'1y'};
 
 async function loadCandles(sym,tf){
-  setLoading(true);
-  stopTick();
+  setLoad(true);
+  stopLive();
   try{
-    const candles = isIndian(sym) ? await yData(sym,tf) : await bnData(sym,tf);
-    if(!candles||!candles.length){setLoading(false);return;}
-    allCandles = candles;
-    cs.setData(candles);
-    vs.setData(candles.map(c=>({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'})));
-    renderIndicatorData();
-    computeORB(candles);
-    checkAlerts(candles);
+    const data = isIndian(sym)?await yData(sym,tf):await bnData(sym,tf);
+    if(!data?.length){setLoad(false);return;}
+    allCandles=data;
+    cs.setData(data);
+    vs.setData(data.map(c=>({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'})));
+    openPrice=data[data.length-1]?.open||0;
+    renderIndData();
+    computeORB(data);
+    checkAlerts([data[data.length-1]]);
     chart.timeScale().fitContent();
-    updatePriceBar(candles[candles.length-1],candles[candles.length-2]);
-    // Redraw alert lines
-    Object.values(pricelines).forEach(pl=>{try{cs.removePriceLine(pl);}catch(e){}});
-    pricelines={};
-    alerts.filter(a=>!a.fired&&a.sym===sym).forEach(a=>addAlertLine(a));
+    updatePBar(data[data.length-1],data[data.length-2]);
+    // Restore alert lines for this symbol
+    Object.values(plines).forEach(pl=>{try{cs.removePriceLine(pl);}catch(e){}});
+    plines={};
+    alerts.filter(a=>!a.fired&&a.sym===sym).forEach(addAlLine);
   }catch(e){console.error(e);}
-  setLoading(false);
-  startTick(sym,tf);
+  setLoad(false);
+  startLive(sym,tf);
 }
 
 async function bnData(sym,tf){
-  const limit=tf==='1d'?365:500;
-  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${BN_IV[tf]||tf}&limit=${limit}`);
+  const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${BN_IV[tf]||tf}&limit=500`);
   const d=await r.json();
   if(!Array.isArray(d))return[];
   return d.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5]}));
@@ -526,26 +667,27 @@ async function bnData(sym,tf){
 
 async function yData(sym,tf){
   const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${YH_IV[tf]||'5m'}&range=${YH_RG[tf]||'5d'}&includePrePost=false`;
-  try{
-    const r=await fetch(url);
-    const d=await r.json();
-    const res=d.chart?.result?.[0];
-    if(!res)return[];
-    const ts=res.timestamps||res.timestamp||[];
-    const q=res.indicators?.quote?.[0]||{};
-    return ts.map((t,i)=>({
-      time:t,open:q.open?.[i],high:q.high?.[i],low:q.low?.[i],close:q.close?.[i],volume:q.volume?.[i]||0
-    })).filter(c=>c.open&&c.close);
-  }catch(e){return[];}
+  const r=await fetch(url);
+  const d=await r.json();
+  const res=d.chart?.result?.[0];
+  if(!res)return[];
+  const ts=res.timestamps||res.timestamp||[];
+  const q=res.indicators?.quote?.[0]||{};
+  return ts.map((t,i)=>({
+    time:t,open:q.open?.[i],high:q.high?.[i],
+    low:q.low?.[i],close:q.close?.[i],volume:q.volume?.[i]||0
+  })).filter(c=>c.open&&c.close&&!isNaN(c.close));
 }
 
-// ══════════════════════════════════════════════════════════
-// LIVE TICK — UPDATE LAST CANDLE EVERY SECOND
-// ══════════════════════════════════════════════════════════
-function startTick(sym,tf){
+// ═══════════════════════════════════════════════════════════════
+// LIVE FEED — updates every ~250ms for crypto, 5s for Indian
+// ═══════════════════════════════════════════════════════════════
+let liveData={};
+
+function startLive(sym,tf){
   if(isIndian(sym)){
-    // Yahoo Finance — poll every 5s (rate limit friendly)
-    tickTimer = setInterval(async()=>{
+    // Poll Yahoo every 5s for Indian
+    tickInterval=setInterval(async()=>{
       try{
         const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1m&range=1d&includePrePost=false`);
         const d=await r.json();
@@ -553,74 +695,69 @@ function startTick(sym,tf){
         if(!res)return;
         const ts=res.timestamps||[];
         const q=res.indicators?.quote?.[0]||{};
-        if(!ts.length)return;
-        const last={time:ts[ts.length-1],open:q.open?.[ts.length-1],high:q.high?.[ts.length-1],low:q.low?.[ts.length-1],close:q.close?.[ts.length-1],volume:q.volume?.[ts.length-1]||0};
-        if(!last.close)return;
-        updateLastCandle(last);
+        const i=ts.length-1;
+        if(i<0)return;
+        const c={time:ts[i],open:q.open?.[i],high:q.high?.[i],low:q.low?.[i],close:q.close?.[i],volume:q.volume?.[i]||0};
+        if(!c.close)return;
+        tickUpdate(c);
       }catch(e){}
     },5000);
+    setDot('green');
   } else {
-    // Binance WebSocket — real-time 1s updates
+    // Binance kline WebSocket — fires every 250ms with new data
+    const iv=BN_IV[tf]||tf;
     if(liveWs){try{liveWs.close();}catch(e){}}
-    const interval = BN_IV[tf]||tf;
-    liveWs = new WebSocket(`wss://stream.binance.com:9443/ws/${sym.toLowerCase()}@kline_${interval}`);
-    liveWs.onmessage = e=>{
-      const msg=JSON.parse(e.data);
-      const k=msg.k;
+    liveWs=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.toLowerCase()}@kline_${iv}`);
+    liveWs.onmessage=e=>{
+      const k=JSON.parse(e.data).k;
       if(!k)return;
-      const candle={time:Math.floor(k.t/1000),open:+k.o,high:+k.h,low:+k.l,close:+k.c,volume:+k.v};
-      updateLastCandle(candle);
-      // Update watchlist price
-      liveData[sym]=candle.close;
+      const c={time:Math.floor(k.t/1000),open:+k.o,high:+k.h,low:+k.l,close:+k.c,volume:+k.v};
+      tickUpdate(c);
+      liveData[sym]=c.close;
       renderWlPrices();
     };
-    liveWs.onerror=()=>setTimeout(()=>startTick(sym,tf),3000);
-    liveWs.onopen=()=>document.getElementById('liveDot').style.background='var(--G)';
-    liveWs.onclose=()=>{document.getElementById('liveDot').style.background='var(--R)';};
+    liveWs.onopen=()=>setDot('green');
+    liveWs.onerror=()=>{setDot('red');setTimeout(()=>startLive(sym,tf),3000);};
+    liveWs.onclose=()=>setDot('orange');
   }
 }
 
-function stopTick(){
-  if(tickTimer){clearInterval(tickTimer);tickTimer=null;}
-  if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}
+function stopLive(){
+  if(tickInterval){clearInterval(tickInterval);tickInterval=null;}
+  if(liveWs){try{liveWs.close();}catch(e){};liveWs=null;}
 }
 
-function updateLastCandle(c){
+function tickUpdate(c){
   if(!allCandles.length)return;
   const last=allCandles[allCandles.length-1];
-  const prev=allCandles[allCandles.length-2];
-  if(c.time>last.time){
-    // New candle
-    allCandles.push(c);
-    if(allCandles.length>1000)allCandles.shift();
-  } else {
-    // Update existing
-    allCandles[allCandles.length-1]={...last,...c};
-  }
+  if(c.time>last.time){allCandles.push(c);if(allCandles.length>2000)allCandles.shift();}
+  else{allCandles[allCandles.length-1]={...last,...c};}
   cs.update(allCandles[allCandles.length-1]);
   vs.update({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'});
-  updatePriceBar(c,prev||last);
+  updatePBar(c,allCandles[allCandles.length-2]||c);
   checkAlerts([c]);
 }
 
-let liveData={};
+function setDot(color){
+  const d=document.getElementById('ldot');
+  const m={green:'var(--G)',red:'var(--R)',orange:'var(--O)'};
+  d.style.background=m[color]||m.green;
+  d.style.boxShadow=`0 0 5px ${m[color]||m.green}`;
+}
+
 function renderWlPrices(){
   document.querySelectorAll('.wrow').forEach(el=>{
     const s=el.dataset.s;
-    if(liveData[s]){
-      const pxEl=el.querySelector('.wpx');
-      if(pxEl)pxEl.textContent=f(liveData[s]);
-    }
+    if(liveData[s]){const px=el.querySelector('.wpx');if(px)px.textContent=f(liveData[s]);}
   });
 }
 
-// ══════════════════════════════════════════════════════════
-// ORB COMPUTATION
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ORB
+// ═══════════════════════════════════════════════════════════════
 function computeORB(candles){
   orbH=null;orbL=null;
-  document.getElementById('orbH').style.display='none';
-  document.getElementById('orbL').style.display='none';
+  ['orbHTag','orbLTag'].forEach(id=>document.getElementById(id).style.display='none');
   if(!isIndian(curSym))return;
   const today=new Date().toDateString();
   const orb=candles.filter(c=>{
@@ -632,124 +769,137 @@ function computeORB(candles){
   if(!orb.length)return;
   orbH=Math.max(...orb.map(c=>c.high));
   orbL=Math.min(...orb.map(c=>c.low));
-  document.getElementById('orbH').textContent=`ORB H ${f(orbH)}`;
-  document.getElementById('orbH').style.display='';
-  document.getElementById('orbL').textContent=`ORB L ${f(orbL)}`;
-  document.getElementById('orbL').style.display='';
+  document.getElementById('orbHTag').textContent=`ORB H ${f(orbH)}`;
+  document.getElementById('orbHTag').style.display='';
+  document.getElementById('orbLTag').textContent=`ORB L ${f(orbL)}`;
+  document.getElementById('orbLTag').style.display='';
   cs.createPriceLine({price:orbH,color:'#00d085',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ORB H'});
   cs.createPriceLine({price:orbL,color:'#ff4560',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Dashed,title:'ORB L'});
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // PRICE BAR
-// ══════════════════════════════════════════════════════════
-function updatePriceBar(last,prev){
-  if(!last)return;
-  document.getElementById('cprice').textContent=f(last.close);
-  if(prev){
-    const d=last.close-prev.close,p=(d/prev.close*100).toFixed(2);
-    const el=document.getElementById('cchg');
+// ═══════════════════════════════════════════════════════════════
+function updatePBar(last,prev){
+  if(!last?.close)return;
+  document.getElementById('cp').textContent=f(last.close);
+  const ref=openPrice||prev?.close||last.open;
+  if(ref){
+    const d=last.close-ref,p=(d/ref*100).toFixed(2);
+    const el=document.getElementById('chg');
     el.textContent=`${d>=0?'+':''}${f(d)} (${d>=0?'+':''}${p}%)`;
     el.className='chg '+(d>=0?'up':'dn');
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// DRAWING TOOLS
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// DRAWINGS
+// ═══════════════════════════════════════════════════════════════
 function setTool(t){
   curTool=curTool===t?null:t;
-  ['h','t','a'].forEach(x=>document.getElementById('t'+x.toUpperCase())?.classList.remove('on'));
-  if(curTool)document.getElementById('t'+curTool.toUpperCase())?.classList.add('on');
+  ['H','T','A'].forEach(x=>document.getElementById('t'+x)?.classList.remove('on'));
+  if(curTool==='h')document.getElementById('tH').classList.add('on');
+  if(curTool==='t')document.getElementById('tT').classList.add('on');
+  if(curTool==='a')document.getElementById('tA').classList.add('on');
   document.getElementById('chart').style.cursor=curTool?'crosshair':'default';
 }
 
 function drawHLine(price){
-  const pl=cs.createPriceLine({price,color:'#4c8eff',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,title:`${f(price)}`});
-  drawings.push(pl);
+  try{
+    const pl=cs.createPriceLine({price,color:'#4c8eff',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,title:f(price)});
+    drawings.push(pl);
+  }catch(e){}
 }
 
-function clearAll(){
+function clearDrawings(){
   drawings.forEach(pl=>{try{cs.removePriceLine(pl);}catch(e){}});
   drawings=[];
   setTool(null);
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // INDICATORS
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function openIndModal(){document.getElementById('indModal').classList.add('open');}
 function closeIndModal(){document.getElementById('indModal').classList.remove('open');}
 
 function saveInd(){
   const name=document.getElementById('iname').value.trim();
-  if(!name){alert('Enter name');return;}
+  if(!name){showToast('Enter indicator name','warn');return;}
   const ind={
     id:Date.now(),name,
-    script:document.getElementById('iscript').value,
     type:document.getElementById('itype').value,
     period:parseInt(document.getElementById('iperiod').value)||20,
     color:document.getElementById('icolor').value,
+    script:document.getElementById('iscript').value,
     visible:true
   };
   indicators.push(ind);
   ss('av_ind',indicators);
   renderIndList();
+  // Add to alert indicator dropdown
+  updateIndDropdown();
   closeIndModal();
   document.getElementById('iname').value='';
   document.getElementById('iscript').value='';
-  renderIndicatorData();
+  renderIndData();
+  showToast(`✅ Indicator "${name}" added`,'success');
 }
 
-function renderIndicatorData(){
-  // Clear old series
+function renderIndData(){
   Object.entries(indSeries).forEach(([id,s])=>{try{chart.removeSeries(s);}catch(e){}});
   indSeries={};
   if(!allCandles.length)return;
-  indicators.filter(i=>i.visible).forEach(ind=>{
+  indicators.filter(i=>i.visible&&i.type!=='pine').forEach(ind=>{
     try{
       if(ind.type==='sma'||ind.type==='ema'){
         const vals=calcMA(allCandles,ind.period,ind.type);
-        const s=chart.addLineSeries({color:ind.color,lineWidth:1,title:ind.name,lastValueVisible:false,priceLineVisible:false});
-        s.setData(vals.filter(v=>v.value!==null));
+        const s=chart.addLineSeries({color:ind.color,lineWidth:1,title:ind.name,lastValueVisible:true,priceLineVisible:false});
+        s.setData(vals.filter(v=>v.value!==null&&!isNaN(v.value)));
         indSeries[ind.id]=s;
       } else if(ind.type==='bb'){
         const {upper,mid,lower}=calcBB(allCandles,20,2);
-        [upper,mid,lower].forEach((arr,i)=>{
-          const s=chart.addLineSeries({color:i===1?ind.color:'#ffffff40',lineWidth:1,lastValueVisible:false,priceLineVisible:false});
-          s.setData(arr.filter(v=>v.value!==null));
-          if(i===0)indSeries[ind.id]=s;
-        });
+        const su=chart.addLineSeries({color:ind.color,lineWidth:1,lastValueVisible:false,priceLineVisible:false,title:ind.name+' U'});
+        const sm=chart.addLineSeries({color:ind.color+'80',lineWidth:1,lastValueVisible:false,priceLineVisible:false,title:ind.name+' M'});
+        const sl=chart.addLineSeries({color:ind.color,lineWidth:1,lastValueVisible:false,priceLineVisible:false,title:ind.name+' L'});
+        su.setData(upper.filter(v=>v.value!==null));
+        sm.setData(mid.filter(v=>v.value!==null));
+        sl.setData(lower.filter(v=>v.value!==null));
+        indSeries[ind.id+'_u']=su;indSeries[ind.id+'_m']=sm;indSeries[ind.id+'_l']=sl;
+      } else if(ind.type==='vwap'){
+        const vwap=calcVWAP(allCandles);
+        const s=chart.addLineSeries({color:ind.color,lineWidth:2,title:'VWAP',lastValueVisible:true,priceLineVisible:false});
+        s.setData(vwap.filter(v=>v.value!==null));
+        indSeries[ind.id]=s;
       }
-      // RSI/MACD need separate pane — skip overlay for now, just store
-    }catch(e){console.error('Ind error',e);}
+    }catch(e){console.error('Indicator error:',e);}
   });
 }
 
 function calcMA(candles,period,type){
-  const result=[];
+  const r=[];let ema=null;
   for(let i=0;i<candles.length;i++){
-    if(i<period-1){result.push({time:candles[i].time,value:null});continue;}
-    let val;
+    if(i<period-1){r.push({time:candles[i].time,value:null});continue;}
     if(type==='sma'){
-      val=candles.slice(i-period+1,i+1).reduce((s,c)=>s+c.close,0)/period;
+      const v=candles.slice(i-period+1,i+1).reduce((s,c)=>s+c.close,0)/period;
+      r.push({time:candles[i].time,value:v});
     } else {
       const k=2/(period+1);
-      if(i===period-1) val=candles.slice(0,period).reduce((s,c)=>s+c.close,0)/period;
-      else val=candles[i].close*k+(result[i-1]?.value||candles[i].close)*(1-k);
+      if(ema===null)ema=candles.slice(0,period).reduce((s,c)=>s+c.close,0)/period;
+      else ema=candles[i].close*k+ema*(1-k);
+      r.push({time:candles[i].time,value:ema});
     }
-    result.push({time:candles[i].time,value:val});
   }
-  return result;
+  return r;
 }
 
-function calcBB(candles,period,mult){
+function calcBB(candles,p,mult){
   const upper=[],mid=[],lower=[];
   for(let i=0;i<candles.length;i++){
-    if(i<period-1){upper.push({time:candles[i].time,value:null});mid.push({time:candles[i].time,value:null});lower.push({time:candles[i].time,value:null});continue;}
-    const sl=candles.slice(i-period+1,i+1).map(c=>c.close);
-    const m=sl.reduce((s,v)=>s+v,0)/period;
-    const sd=Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/period);
+    if(i<p-1){upper.push({time:candles[i].time,value:null});mid.push({time:candles[i].time,value:null});lower.push({time:candles[i].time,value:null});continue;}
+    const sl=candles.slice(i-p+1,i+1).map(c=>c.close);
+    const m=sl.reduce((s,v)=>s+v,0)/p;
+    const sd=Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/p);
     upper.push({time:candles[i].time,value:m+mult*sd});
     mid.push({time:candles[i].time,value:m});
     lower.push({time:candles[i].time,value:m-mult*sd});
@@ -757,112 +907,121 @@ function calcBB(candles,period,mult){
   return{upper,mid,lower};
 }
 
+function calcVWAP(candles){
+  let cumTP=0,cumVol=0;
+  return candles.map(c=>{
+    const tp=(c.high+c.low+c.close)/3;
+    cumTP+=tp*(c.volume||1);cumVol+=(c.volume||1);
+    return{time:c.time,value:cumVol>0?cumTP/cumVol:null};
+  });
+}
+
 function toggleInd(id){
   const i=indicators.find(x=>x.id===id);
-  if(i){i.visible=!i.visible;ss('av_ind',indicators);renderIndList();renderIndicatorData();}
+  if(i){i.visible=!i.visible;ss('av_ind',indicators);renderIndList();renderIndData();}
 }
-
 function deleteInd(id){
-  const s=indSeries[id];if(s){try{chart.removeSeries(s);}catch(e){}}
-  delete indSeries[id];
+  ['','_u','_m','_l'].forEach(sfx=>{const s=indSeries[id+sfx];if(s){try{chart.removeSeries(s);}catch(e){}delete indSeries[id+sfx];}});
   indicators=indicators.filter(i=>i.id!==id);
-  ss('av_ind',indicators);
-  renderIndList();
+  ss('av_ind',indicators);renderIndList();updateIndDropdown();
 }
 
-// ══════════════════════════════════════════════════════════
-// ALERTS
-// ══════════════════════════════════════════════════════════
-let alSide = 'buy';
+function updateIndDropdown(){
+  const sel=document.getElementById('alIndicator');
+  sel.innerHTML='<option value="">None — Price based</option>';
+  indicators.forEach(i=>{
+    const o=document.createElement('option');
+    o.value=i.id;o.textContent=i.name;
+    sel.appendChild(o);
+  });
+}
 
+// ═══════════════════════════════════════════════════════════════
+// ALERTS
+// ═══════════════════════════════════════════════════════════════
 function setAlSide(side){
-  alSide = side;
-  const buyBtn  = document.getElementById('alBuyBtn');
-  const sellBtn = document.getElementById('alSellBtn');
-  const confBtn = document.getElementById('alConfirmBtn');
-  const typeSel = document.getElementById('alType');
+  alSide=side;
+  const buy=document.getElementById('alBuyBtn'),sell=document.getElementById('alSellBtn'),ok=document.getElementById('alOkBtn');
   if(side==='buy'){
-    buyBtn.style.background='var(--G)'; buyBtn.style.borderColor='var(--G)'; buyBtn.style.color='#fff';
-    sellBtn.style.background='transparent'; sellBtn.style.borderColor='var(--R)20'; sellBtn.style.color='var(--R)';
-    confBtn.style.background='var(--G)';
-    typeSel.value='buy';
+    buy.style.cssText='border-color:var(--G);background:var(--G);color:#fff';
+    sell.style.cssText='border-color:var(--R)30;background:transparent;color:var(--R)';
+    ok.style.background='var(--G)';
+    document.getElementById('alType').value='buy';
   } else {
-    sellBtn.style.background='var(--R)'; sellBtn.style.borderColor='var(--R)'; sellBtn.style.color='#fff';
-    buyBtn.style.background='transparent'; buyBtn.style.borderColor='var(--G)20'; buyBtn.style.color='var(--G)';
-    confBtn.style.background='var(--R)';
-    typeSel.value='sell';
+    sell.style.cssText='border-color:var(--R);background:var(--R);color:#fff';
+    buy.style.cssText='border-color:var(--G)30;background:transparent;color:var(--G)';
+    ok.style.background='var(--R)';
+    document.getElementById('alType').value='sell';
   }
 }
 
 function openAlModal(price){
   alSide='buy';
-  document.getElementById('alPrice').textContent=f(price);
-  document.getElementById('alPriceInput').value=price;
-  document.getElementById('alQty').value=1;
+  setAlSide('buy');
+  document.getElementById('alSymTitle').textContent=curSym;
+  document.getElementById('alPriceIn').value=price;
+  document.getElementById('alQtyIn').value=1;
   document.getElementById('alOrdType').value='MARKET';
   document.getElementById('alNote').value='';
-  // Reset buttons to BUY selected
-  setAlSide('buy');
+  document.getElementById('alTFSel').value='same';
+  document.getElementById('alCondition').value='cross';
+  updateIndDropdown();
   document.getElementById('alModal').classList.add('open');
 }
-
-function closeAlModal(){
-  document.getElementById('alModal').classList.remove('open');
-  pendingPrice=null;
-}
+function closeAlModal(){document.getElementById('alModal').classList.remove('open');pendingPrice=null;}
 
 function confirmAl(){
-  const price = parseFloat(document.getElementById('alPriceInput').value) || pendingPrice;
-  if(!price){showNotif('Enter a price','warn');return;}
-  const qty  = parseInt(document.getElementById('alQty').value)||1;
-  const ordType = document.getElementById('alOrdType').value;
-  const type = document.getElementById('alType').value;
+  const price=parseFloat(document.getElementById('alPriceIn').value)||pendingPrice;
+  if(!price){showToast('Enter a price','warn');return;}
+  const tfSel=document.getElementById('alTFSel').value;
+  const tf=tfSel==='same'?curTF:tfSel;
   const a={
-    id:       Date.now(),
-    sym:      curSym,
-    tf:       curTF,
-    price,
-    type,
-    side:     alSide.toUpperCase(),
-    qty,
-    ordType,
-    note:     document.getElementById('alNote').value,
-    sendBot:  true,
-    enabled:  true,
-    fired:    false,
-    createdAt:new Date().toISOString()
-  };
-  alerts.push(a); ss('av_al',alerts);
-  addAlertLine(a);
-  renderAlList();
-  closeAlModal();
-  showNotif(`🔔 Alert set: ${alSide.toUpperCase()} ${curSym} @ ${f(price)} | Qty: ${qty} | ${ordType}`,'success');
-}
-
-function createAlert(isSell){
-  const price=parseFloat(document.getElementById('aprice').value);
-  if(!price){showNotif('Enter price','warn');return;}
-  const type = isSell?'sell':document.getElementById('atype').value;
-  const a={
-    id:Date.now(),sym:curSym,tf:curTF,price,
-    type, side: isSell?'SELL':'BUY',
-    qty:1, ordType:'MARKET',
-    note:document.getElementById('anote').value,
+    id:Date.now(),
+    sym:curSym,tf,price,
+    type:document.getElementById('alType').value,
+    side:alSide.toUpperCase(),
+    qty:parseInt(document.getElementById('alQtyIn').value)||1,
+    ordType:document.getElementById('alOrdType').value,
+    condition:document.getElementById('alCondition').value,
+    indicator:document.getElementById('alIndicator').value,
+    trigger:document.getElementById('alTrigger').value,
+    note:document.getElementById('alNote').value,
     sendBot:true,enabled:true,fired:false,
     createdAt:new Date().toISOString()
   };
   alerts.push(a);ss('av_al',alerts);
-  addAlertLine(a);
+  addAlLine(a);
   renderAlList();
-  document.getElementById('aprice').value='';
-  showNotif(`🔔 Alert set: ${type.replace('_',' ').toUpperCase()} @ ${f(price)}`,'success');
+  closeAlModal();
+  showToast(`🔔 Alert set: ${alSide.toUpperCase()} ${curSym} @ ${f(price)} | ${a.ordType}`,'success');
 }
 
-function addAlertLine(a){
-  const colors={buy:'#00d085',sell:'#ff4560',buy_sl:'#ff4560',buy_tgt:'#00d085',sell_sl:'#00d085',sell_tgt:'#ff4560'};
+function quickAlert(isSell){
+  const price=parseFloat(document.getElementById('aprice').value);
+  if(!price){showToast('Enter price','warn');return;}
+  const a={
+    id:Date.now(),sym:curSym,tf:curTF,price,
+    type:isSell?'sell':document.getElementById('atype').value,
+    side:isSell?'SELL':'BUY',
+    qty:parseInt(document.getElementById('aqty').value)||1,
+    ordType:'MARKET',condition:'cross',trigger:'once',
+    note:'',sendBot:true,enabled:true,fired:false,
+    createdAt:new Date().toISOString()
+  };
+  alerts.push(a);ss('av_al',alerts);
+  addAlLine(a);renderAlList();
+  document.getElementById('aprice').value='';
+  showToast(`🔔 Alert: ${a.side} ${curSym} @ ${f(price)}`,'success');
+}
+
+const AL_COLORS={buy:'#00d085',sell:'#ff4560',buy_sl:'#ff4560',buy_tgt:'#00d085',sell_sl:'#00d085',sell_tgt:'#ff4560'};
+
+function addAlLine(a){
   try{
-    const pl=cs.createPriceLine({price:a.price,color:colors[a.type]||'#f59e0b',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,title:`🔔${a.type.replace('_',' ').toUpperCase()} ${f(a.price)}`});
-    pricelines[a.id]=pl;
+    const pl=cs.createPriceLine({price:a.price,color:AL_COLORS[a.type]||'#f59e0b',lineWidth:1,
+      lineStyle:LightweightCharts.LineStyle.Dotted,
+      title:`🔔${a.side} ${f(a.price)} ×${a.qty}`});
+    plines[a.id]=pl;
   }catch(e){}
 }
 
@@ -870,148 +1029,115 @@ function toggleAl(id){
   const a=alerts.find(x=>x.id===id);
   if(a){a.enabled=!a.enabled;ss('av_al',alerts);renderAlList();}
 }
-
 function deleteAl(id){
-  const pl=pricelines[id];if(pl){try{cs.removePriceLine(pl);}catch(e){}}
-  delete pricelines[id];
-  alerts=alerts.filter(a=>a.id!==id);ss('av_al',alerts);
-  renderAlList();
+  const pl=plines[id];if(pl){try{cs.removePriceLine(pl);}catch(e){}delete plines[id];}
+  alerts=alerts.filter(a=>a.id!==id);ss('av_al',alerts);renderAlList();
 }
 
 function checkAlerts(candles){
-  const last=candles[candles.length-1];if(!last)return;
+  if(!candles?.length)return;
+  const last=candles[candles.length-1];
+  if(!last?.close)return;
   let changed=false;
   alerts.filter(a=>a.enabled&&!a.fired&&a.sym===curSym).forEach(a=>{
     const px=last.close;
-    const trig=(a.type==='buy'||a.type==='buy_tgt')?px>=a.price
-      :(a.type==='sell'||a.type==='sell_tgt')?px<=a.price
-      :(a.type==='buy_sl')?px<=a.price
-      :(a.type==='sell_sl')?px>=a.price:false;
+    const cond=a.condition||'cross';
+    const trig=
+      cond==='above'?px>a.price:
+      cond==='below'?px<a.price:
+      // cross — default
+      (a.type==='buy'||a.type==='buy_tgt')?px>=a.price:
+      (a.type==='sell'||a.type==='sell_tgt')?px<=a.price:
+      (a.type==='buy_sl')?px<=a.price:
+      (a.type==='sell_sl')?px>=a.price:false;
+
     if(trig){
-      a.fired=true;a.firedAt=new Date().toISOString();
-      const col={buy:'var(--G)',sell:'var(--R)',buy_sl:'var(--R)',buy_tgt:'var(--G)',sell_sl:'var(--G)',sell_tgt:'var(--R)'};
-      showNotif(`🔔 Alert fired: ${a.type.replace('_',' ').toUpperCase()} ${a.sym} @ ${f(a.price)}`, a.type.startsWith('buy')?'success':'error');
-      fired.unshift({...a});fired=fired.slice(0,50);
+      if(a.trigger!=='every') a.fired=true;
+      a.firedAt=new Date().toISOString();
+      fired.unshift({...a,price:px});
+      fired=fired.slice(0,50);
       ss('av_fired',fired);
       changed=true;
-      // Always try to send to bot if URL configured
-      if(botUrl && (a.sendBot!==false)) sendToBotBroker(a,px);
+      showToast(`🔔 ${a.type.replace('_',' ').toUpperCase()} ${a.sym} @ ${f(px)}`,'info');
+      if(a.sendBot&&botUrl) sendToBot(a,px);
     }
   });
   if(changed){ss('av_al',alerts);renderAlList();renderFired();}
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // BOT INTEGRATION
-// ══════════════════════════════════════════════════════════
-async function sendToBotBroker(alert,price){
-  if(!botUrl){ showNotif('⚠️ AlgoBot URL not set. Configure in Bot Config tab.','warn'); return; }
+// ═══════════════════════════════════════════════════════════════
+async function sendToBot(alert,price){
+  if(!botUrl)return;
+  const side=(alert.type==='buy'||alert.type==='buy_tgt')?'BUY'
+    :(alert.type==='sell'||alert.type==='sell_tgt')?'SELL'
+    :(alert.type==='buy_sl')?'SELL'
+    :(alert.type==='sell_sl')?'BUY':'BUY';
+  const payload={
+    symbol:alert.sym,side,price:price||alert.price,
+    type:alert.type,tf:alert.tf||curTF,
+    qty:alert.qty||1,orderType:alert.ordType||'MARKET',
+    note:alert.note||'',source:'chart',
+    timestamp:new Date().toISOString()
+  };
   try{
-    // Determine side from alert type
-    const side = (alert.type==='buy'||alert.type==='buy_tgt')?'BUY'
-      :(alert.type==='sell'||alert.type==='sell_tgt')?'SELL'
-      :(alert.type==='buy_sl')?'SELL'   // SL hit → exit buy = sell
-      :(alert.type==='sell_sl')?'BUY'   // SL hit → exit sell = buy
-      :'BUY';
-
-    const payload={
-      symbol:    alert.sym,
-      side,
-      price:     price||alert.price,
-      type:      alert.type,
-      tf:        alert.tf||curTF,
-      note:      alert.note||'',
-      qty:       alert.qty||1,
-      orderType: alert.ordType||'MARKET',
-      source:    'chart',
-      timestamp: new Date().toISOString()
-    };
-
-    showNotif(`🚀 Sending ${side} ${alert.sym} to AlgoBot...`,'info');
-
-    const r = await fetch(`${botUrl}/api/alerts/webhook`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000)
+    const r=await fetch(`${botUrl}/api/alerts/webhook`,{
+      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)
     });
-
-    const d = await r.json();
-
+    const d=await r.json();
     if(d.success){
-      const broker = d.broker?.toUpperCase()||'BROKER';
-      const ordId  = d.result?.orderId||d.result?.order?.id||'—';
-      showNotif(`✅ ${side} ${alert.sym} placed on ${broker}! Order: ${ordId}`,'success');
-      // Add to fired log
-      const entry = {...alert, firedAt:new Date().toISOString(), orderId:ordId, broker, status:'EXECUTED'};
-      fired.unshift(entry); fired=fired.slice(0,50);
-      ss('av_fired',fired);
-      renderFired();
+      const broker=d.broker?.toUpperCase()||'BROKER';
+      const oid=d.result?.orderId||d.result?.order?.id||'—';
+      showToast(`✅ ${side} ${alert.sym} → ${broker} | Order: ${oid}`,'success');
     } else {
-      showNotif(`❌ Order failed: ${d.error||d.reason||'Unknown error'}`,'error');
+      showToast(`❌ ${d.error||d.reason||'Order failed'}`,'error');
     }
-  }catch(e){
-    showNotif(`❌ Cannot reach AlgoBot: ${e.message}`,'error');
-    console.error('[BOT]',e);
-  }
+  }catch(e){showToast(`❌ Bot unreachable: ${e.message}`,'error');}
 }
 
-function openBotConfig(){document.getElementById('botUrlM').value=botUrl;document.getElementById('botModal').classList.add('open');}
+function openBotModal(){
+  document.getElementById('botUrlM').value=botUrl;
+  document.getElementById('botModal').classList.add('open');
+}
 
 function saveBotConfig(){
   botUrl=document.getElementById('botUrlM').value.trim().replace(/\/$/,'');
   localStorage.setItem('av_bot',botUrl);
-  // Sync to inline input
-  const inEl=document.getElementById('botUrlInput');
-  if(inEl)inEl.value=botUrl;
+  const inp=document.getElementById('botUrlIn');
+  if(inp)inp.value=botUrl;
   document.getElementById('botModal').classList.remove('open');
-  testBotConn();
+  testBot();
 }
 
-function saveBotUrlInline(v){
-  botUrl=v.trim().replace(/\/$/,'');
+async function testBot(){
+  const inp=document.getElementById('botUrlIn');
+  if(inp&&inp.value)botUrl=inp.value.trim().replace(/\/$/,'');
+  if(!botUrl){document.getElementById('botRes').textContent='Enter URL';return;}
   localStorage.setItem('av_bot',botUrl);
-}
-
-async function testBotConn(){
-  // Also read from inline input
-  const inEl=document.getElementById('botUrlInput');
-  if(inEl&&inEl.value) botUrl=inEl.value.trim().replace(/\/$/,'');
-  if(!botUrl){
-    document.getElementById('botTestResult').style.color='var(--O)';
-    document.getElementById('botTestResult').textContent='⚠️ Enter URL first';
-    return;
-  }
-  localStorage.setItem('av_bot',botUrl);
-  document.getElementById('botTestResult').style.color='var(--t2)';
-  document.getElementById('botTestResult').textContent='Testing...';
+  document.getElementById('botRes').textContent='Testing...';
   try{
     const r=await fetch(`${botUrl}/api/health`,{signal:AbortSignal.timeout(8000)});
     const d=await r.json();
     if(d.status==='ok'){
-      botOk=true;
-      document.getElementById('botStatus').className='bot-status conn';
+      document.getElementById('botSt').className='botstatus conn';
       document.getElementById('botTxt').textContent=`Bot ✅`;
-      document.getElementById('botTestResult').style.color='var(--G)';
-      document.getElementById('botTestResult').textContent=`✅ Connected | Auth:${d.auth?'✓':'✗'} Feed:${d.dataFeed?'✓':'✗'}`;
-      const ci=document.getElementById('botConnInfo');
-      if(ci)ci.style.display='block';
-      showNotif('✅ AlgoBot connected! Alerts will auto-place orders.','success');
-    }else{throw new Error(JSON.stringify(d));}
+      document.getElementById('botRes').style.color='var(--G)';
+      document.getElementById('botRes').textContent=`✅ Connected | Auth:${d.auth?'✓':'✗'} Feed:${d.dataFeed?'✓':'✗'}`;
+      showToast('✅ AlgoBot connected! Alerts will auto-trade.','success');
+    } else throw new Error('bad');
   }catch(e){
-    botOk=false;
-    document.getElementById('botStatus').className='bot-status disc';
+    document.getElementById('botSt').className='botstatus disc';
     document.getElementById('botTxt').textContent='Bot ✗';
-    document.getElementById('botTestResult').style.color='var(--R)';
-    document.getElementById('botTestResult').textContent=`❌ ${e.message.substring(0,60)}`;
-    const ci=document.getElementById('botConnInfo');
-    if(ci)ci.style.display='none';
+    document.getElementById('botRes').style.color='var(--R)';
+    document.getElementById('botRes').textContent=`❌ ${e.message.slice(0,50)}`;
   }
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // WATCHLIST
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function addSym(){
   let s=document.getElementById('addIn').value.trim().toUpperCase();
   if(!s)return;
@@ -1019,63 +1145,64 @@ function addSym(){
   if(!watchlist.includes(s))watchlist.push(s);
   ss('av_wl',watchlist);
   document.getElementById('addIn').value='';
-  renderWl();
-  loadSym(s);
+  renderWl();loadSym(s);
 }
 
-function removeSym(s){
-  watchlist=watchlist.filter(x=>x!==s);
-  ss('av_wl',watchlist);
-  renderWl();
-}
-
+function removeSym(s){watchlist=watchlist.filter(x=>x!==s);ss('av_wl',watchlist);renderWl();}
 function loadSym(s){
   curSym=s;
-  document.getElementById('symInput').value=s;
-  document.getElementById('afsym').textContent=s;
-  renderWl();
-  loadCandles(s,curTF);
+  document.getElementById('sinput').value=s;
+  document.getElementById('afSym').textContent=s;
+  renderWl();loadCandles(s,curTF);
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // SYMBOL SEARCH
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function filterSym(q){
-  const dd=document.getElementById('symDd');
-  q=q.trim().toUpperCase();
-  if(!q){dd.classList.remove('open');return;}
-  const hits=ALL_SYMS.filter(s=>s.l.includes(q)||s.n.toUpperCase().includes(q)).slice(0,12);
-  dd.innerHTML=hits.map(s=>`<div class="sym-row" onclick="selectSym('${s.s}')">
+  const dd=document.getElementById('sdd');
+  if(!q){
+    // Show top symbols when focused with empty input
+    const top=ALL_SYMS.slice(0,12);
+    dd.innerHTML=top.map(s=>`<div class="srow" onclick="selectSym('${s.s}')">
+      <div><div class="sn">${s.l}</div><div class="sd">${s.n}</div></div>
+      <span class="sbadge">${s.e}</span></div>`).join('');
+    dd.classList.add('open');return;
+  }
+  const Q=q.trim().toUpperCase();
+  const hits=ALL_SYMS.filter(s=>s.l.includes(Q)||s.n.toUpperCase().includes(Q)).slice(0,12);
+  dd.innerHTML=hits.map(s=>`<div class="srow" onclick="selectSym('${s.s}')">
     <div><div class="sn">${s.l}</div><div class="sd">${s.n}</div></div>
-    <span class="sb">${s.e}</span>
-  </div>`).join('');
+    <span class="sbadge">${s.e}</span></div>`).join('');
   dd.classList.toggle('open',hits.length>0);
 }
 
 function selectSym(s){
-  document.getElementById('symDd').classList.remove('open');
-  document.getElementById('symInput').value=s;
+  document.getElementById('sdd').classList.remove('open');
+  document.getElementById('sinput').value=s;
   if(!watchlist.includes(s)){watchlist.push(s);ss('av_wl',watchlist);}
   loadSym(s);
 }
 
 document.addEventListener('click',e=>{
-  if(!e.target.closest('#symWrap'))document.getElementById('symDd').classList.remove('open');
+  if(!e.target.closest('#swrap'))document.getElementById('sdd').classList.remove('open');
 });
 
-// ══════════════════════════════════════════════════════════
-// TF CHANGE
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// TF
+// ═══════════════════════════════════════════════════════════════
 function setTF(tf){
   curTF=tf;
-  document.querySelectorAll('.tf').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===tf||b.onclick?.toString().includes(`'${tf}'`)));
-  document.getElementById('aftf').textContent=tf.toUpperCase();
+  document.querySelectorAll('.tf').forEach(b=>{
+    b.classList.toggle('on',b.textContent.toLowerCase()===tf||b.getAttribute('onclick')?.includes(`'${tf}'`));
+  });
+  document.getElementById('afTF').textContent=tf.toUpperCase();
   loadCandles(curSym,tf);
 }
 
-// ══════════════════════════════════════════════════════════
-// RENDER FUNCTIONS
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
 function renderWl(){
   document.getElementById('wlEl').innerHTML=watchlist.map(s=>{
     const info=ALL_SYMS.find(x=>x.s===s||x.l===s);
@@ -1085,9 +1212,9 @@ function renderWl(){
         <span class="wsym">${info?.l||s}</span><span class="wex">${info?.e||'NSE'}</span>
         ${info?.n?`<div style="font-size:9px;color:var(--t3);margin-top:1px">${info.n}</div>`:''}
       </div>
-      <div>
-        <div class="wpx">${px}</div>
-        <div style="font-size:9px;color:var(--t3);cursor:pointer;text-align:right" onclick="event.stopPropagation();removeSym('${s}')">✕</div>
+      <div style="text-align:right">
+        <div class="wpx" style="font-size:11px">${px}</div>
+        <div style="font-size:9px;color:var(--t3);cursor:pointer" onclick="event.stopPropagation();removeSym('${s}')">✕</div>
       </div>
     </div>`;
   }).join('');
@@ -1096,51 +1223,54 @@ function renderWl(){
 function renderIndList(){
   const el=document.getElementById('indEl');
   el.innerHTML=!indicators.length?'<div class="note">No indicators</div>':
-  indicators.map(i=>`<div class="ind-row">
-    <div class="ind-top">
-      <span class="ind-nm" style="color:${i.color}">${i.name}</span>
+  indicators.map(i=>`<div class="irow">
+    <div class="itop">
+      <span style="font-size:11px;font-weight:700;color:${i.color}">${i.name}</span>
       <div style="display:flex;gap:3px">
         <button class="ibtn" onclick="toggleInd(${i.id})">${i.visible?'Hide':'Show'}</button>
         <button class="ibtn del" onclick="deleteInd(${i.id})">✕</button>
       </div>
     </div>
-    <div style="font-size:9px;color:var(--t3)">${i.type.toUpperCase()}${i.period?` (${i.period})`:''}</div>
-    ${i.script?`<div style="font-size:9px;color:var(--t3);margin-top:3px;max-height:40px;overflow:hidden">${i.script.substring(0,80)}...</div>`:''}
+    <div style="font-size:9px;color:var(--t3)">${i.type.toUpperCase()}${i.type!=='pine'&&i.period?` (${i.period})`:''}</div>
+    ${i.script?`<div style="font-size:9px;color:var(--t3);margin-top:2px;overflow:hidden;max-height:28px">${i.script.slice(0,70)}${i.script.length>70?'...':''}</div>`:''}
   </div>`).join('');
 }
 
 function renderAlList(){
-  const el=document.getElementById('alEl');
-  const noEl=document.getElementById('noAl');
-  const symAl=alerts.filter(a=>a.sym===curSym);
-  noEl.style.display=symAl.length?'none':'block';
-  const col={buy:'var(--G)',sell:'var(--R)',buy_sl:'var(--R)',buy_tgt:'var(--G)',sell_sl:'var(--G)',sell_tgt:'var(--R)'};
-  el.innerHTML=symAl.map(a=>`<div class="alrow ${a.type.startsWith('buy')?'buy':'sell'} ${a.fired?'fired':''}">
+  const el=document.getElementById('alEl'),no=document.getElementById('noAl');
+  const sa=alerts.filter(a=>a.sym===curSym);
+  no.style.display=sa.length?'none':'block';
+  el.innerHTML=sa.map(a=>`<div class="alrow ${a.type.startsWith('buy')?'buy':'sell'} ${a.fired?'fired':''}">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;font-weight:700;color:${col[a.type]||'var(--O)'}">${a.type.replace('_',' ').toUpperCase()} @ ${f(a.price)}</span>
-      <div style="display:flex;gap:4px;align-items:center">
-        <button class="altog ${a.enabled&&!a.fired?'on':''}" onclick="toggleAl(${a.id})"></button>
+      <span style="font-size:11px;font-weight:700;color:${AL_COLORS[a.type]||'var(--O)'}">
+        ${a.type.replace('_',' ').toUpperCase()} @ ${f(a.price)} ×${a.qty||1}
+      </span>
+      <div style="display:flex;gap:3px;align-items:center">
+        <button class="tog ${a.enabled&&!a.fired?'on':''}" onclick="toggleAl(${a.id})"></button>
         <button class="ibtn del" onclick="deleteAl(${a.id})">✕</button>
       </div>
     </div>
-    <div style="font-size:10px;color:var(--t2);margin-top:2px">${a.tf?.toUpperCase()||'5M'} ${a.sendBot?'🤖':'📊'} ${a.note||''} ${a.fired?'✅ FIRED':''}</div>
+    <div style="font-size:9px;color:var(--t2);margin-top:2px">
+      ${a.tf?.toUpperCase()} · ${a.ordType||'MARKET'} · ${a.sendBot?'🤖 Bot':'📊'} ${a.fired?'✅ FIRED':''}
+    </div>
   </div>`).join('');
 }
 
 function renderFired(){
   const el=document.getElementById('firedEl');
-  if(!fired.length){el.textContent='No fired alerts yet';el.className='note';return;}
+  if(!fired.length){el.textContent='No fired alerts';el.className='note';return;}
   el.className='';
-  const col={buy:'var(--G)',sell:'var(--R)',buy_sl:'var(--R)',buy_tgt:'var(--G)',sell_sl:'var(--G)',sell_tgt:'var(--R)'};
   el.innerHTML=fired.slice(0,20).map(a=>`<div style="padding:5px 7px;border-radius:5px;margin-bottom:3px;background:var(--bg3);border:1px solid var(--bd)">
-    <div style="color:${col[a.type]||'var(--O)'};font-weight:700;font-size:11px">${a.sym} — ${a.type.replace('_',' ').toUpperCase()} @ ${f(a.price)} ${a.sendBot?'🤖 Sent to Bot':''}</div>
+    <div style="color:${AL_COLORS[a.type]||'var(--O)'};font-weight:700;font-size:11px">
+      ${a.sym} — ${a.type.replace('_',' ').toUpperCase()} @ ${f(a.price)} ×${a.qty||1} ${a.sendBot?'🤖':'📊'}
+    </div>
     <div style="font-size:10px;color:var(--t2)">${a.tf?.toUpperCase()} · ${new Date(a.firedAt||a.createdAt).toLocaleString('en-IN')}</div>
   </div>`).join('');
 }
 
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // TABS
-// ══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function showSTab(id,el){
   ['wl','ind','al'].forEach(t=>document.getElementById('stab-'+t).style.display=t===id?'block':'none');
   document.querySelectorAll('.stab').forEach(s=>s.classList.remove('on'));
@@ -1155,73 +1285,69 @@ function showBTab(id,el){
   if(id==='fa')renderFired();
 }
 
-// ══════════════════════════════════════════════════════════
-// LOADING
-// ══════════════════════════════════════════════════════════
-function setLoading(on){
+// ═══════════════════════════════════════════════════════════════
+// LOADING + TOAST
+// ═══════════════════════════════════════════════════════════════
+function setLoad(on){
   let el=document.getElementById('ldg');
   if(on){
-    if(!el){el=document.createElement('div');el.id='ldg';el.style.cssText='position:absolute;inset:0;z-index:5;background:#0d0f1488;display:flex;align-items:center;justify-content:center;pointer-events:none;gap:8px;font-size:12px;color:var(--t2)';el.innerHTML='<div class="spin"></div>Loading...';document.querySelector('.cwrap').appendChild(el);}
+    if(!el){
+      el=document.createElement('div');el.id='ldg';
+      el.style.cssText='position:absolute;inset:0;z-index:5;background:#0d0f1490;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--t2);pointer-events:none';
+      el.innerHTML='<div class="spin"></div>Loading...';
+      document.querySelector('.cwrap').appendChild(el);
+    }
     el.style.display='flex';
   } else if(el) el.style.display='none';
 }
 
-// ══════════════════════════════════════════════════════════
-// BOOT
-// ══════════════════════════════════════════════════════════
-// ── Notification toast ─────────────────────────────────────
-function showNotif(msg, type='info'){
-  let el = document.getElementById('notif');
+function showToast(msg,type='info'){
+  let el=document.getElementById('toast');
   if(!el){
-    el=document.createElement('div');el.id='notif';
-    el.style.cssText='position:fixed;bottom:16px;right:16px;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;max-width:360px;transition:opacity .3s;border:1px solid';
+    el=document.createElement('div');el.id='toast';
+    el.style.cssText='position:fixed;bottom:16px;right:16px;padding:10px 15px;border-radius:8px;font-size:12px;font-weight:600;z-index:9998;max-width:360px;border:1px solid;transition:opacity .3s;pointer-events:none';
     document.body.appendChild(el);
   }
-  const styles={
-    success:{bg:'#00d08520',border:'#00d085',color:'#00d085'},
-    error:  {bg:'#ff456020',border:'#ff4560',color:'#ff4560'},
-    warn:   {bg:'#f59e0b20',border:'#f59e0b',color:'#f59e0b'},
-    info:   {bg:'#4c8eff20',border:'#4c8eff',color:'#4c8eff'},
-  };
-  const s=styles[type]||styles.info;
-  el.style.background=s.bg;el.style.borderColor=s.border;el.style.color=s.color;
+  const st={success:['#00d08515','#00d085','#00d085'],error:['#ff456015','#ff4560','#ff4560'],warn:['#f59e0b15','#f59e0b','#f59e0b'],info:['#4c8eff15','#4c8eff','#4c8eff']};
+  const[bg,bc,tc]=st[type]||st.info;
+  el.style.background=bg;el.style.borderColor=bc;el.style.color=tc;
   el.textContent=msg;el.style.opacity='1';
-  clearTimeout(el._t);
-  el._t=setTimeout(()=>el.style.opacity='0',4000);
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',4000);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MULTI-STREAM WATCHLIST PRICES
+// ═══════════════════════════════════════════════════════════════
+function startWlStream(){
+  const cryptoSyms=watchlist.filter(s=>!isIndian(s));
+  if(!cryptoSyms.length)return;
+  const ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${cryptoSyms.map(s=>s.toLowerCase()+'@miniTicker').join('/')}`);
+  ws.onmessage=e=>{
+    const d=JSON.parse(e.data).data;
+    if(!d)return;
+    liveData[d.s]=parseFloat(d.c);
+    renderWlPrices();
+    if(d.s===curSym&&!liveWs){document.getElementById('cp').textContent=f(liveData[d.s]);}
+  };
+  ws.onerror=()=>setTimeout(startWlStream,5000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
 window.onload=()=>{
   initChart();
-  renderWl();
-  renderIndList();
-  renderAlList();
+  renderWl();renderIndList();renderAlList();updateIndDropdown();
 
-  // Restore bot url
   if(botUrl){
-    const inEl=document.getElementById('botUrlInput');
-    if(inEl)inEl.value=botUrl;
+    const inp=document.getElementById('botUrlIn');
+    if(inp)inp.value=botUrl;
     document.getElementById('botUrlM').value=botUrl;
-    testBotConn();
+    testBot();
   }
 
-  // Load initial symbol
   loadSym(curSym);
-
-  // Auto-reconnect watchlist prices via multi-stream
-  const cryptoSyms=watchlist.filter(s=>!isIndian(s));
-  if(cryptoSyms.length){
-    const ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${cryptoSyms.map(s=>s.toLowerCase()+'@miniTicker').join('/')}`);
-    ws.onmessage=e=>{
-      const d=JSON.parse(e.data).data;
-      if(!d)return;
-      liveData[d.s]=parseFloat(d.c);
-      if(d.s===curSym&&!['1m','3m','5m'].includes(curTF)){
-        document.getElementById('cprice').textContent=f(liveData[d.s]);
-      }
-      renderWlPrices();
-    };
-    ws.onerror=()=>setTimeout(()=>window.location.reload(),10000);
-  }
+  startWlStream();
 };
 </script>
 </body>

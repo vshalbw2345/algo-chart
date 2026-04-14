@@ -3,6 +3,12 @@ const path    = require('path');
 const app     = express();
 const PORT    = process.env.PORT || 3000;
 
-app.use(express.static(__dirname));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'chart.html')));
-app.listen(PORT, () => console.log(`Chart live on port ${PORT}`));
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'chart.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Chart running on port ${PORT}`);
+});

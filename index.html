@@ -269,21 +269,38 @@ body{background:var(--bg);color:var(--t);font-family:var(--font);font-size:12px;
 
 <!-- ALERT LINE MODAL -->
 <div class="ov" id="alModal">
-  <div class="modal">
-    <h3>🔔 Create Alert</h3>
-    <div style="font-size:20px;font-weight:700;color:var(--O);margin-bottom:10px" id="alPrice">—</div>
+  <div class="modal" style="width:420px">
+    <h3>🔔 Set Alert at <span id="alPrice" style="color:var(--O)">—</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <button id="alBuyBtn" onclick="setAlSide('buy')" style="padding:12px;border-radius:8px;border:2px solid var(--G);background:var(--G);color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:var(--font)">▲ BUY</button>
+      <button id="alSellBtn" onclick="setAlSide('sell')" style="padding:12px;border-radius:8px;border:2px solid var(--R)20;background:transparent;color:var(--R);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--font)">▼ SELL</button>
+    </div>
     <label>Alert Type</label>
-    <select id="alType">
-      <option value="buy">Buy Signal</option><option value="sell">Sell Signal</option>
-      <option value="buy_sl">Buy Stoploss</option><option value="buy_tgt">Buy Target</option>
-      <option value="sell_sl">Sell Stoploss</option><option value="sell_tgt">Sell Target</option>
+    <select id="alType" style="margin-bottom:6px">
+      <option value="buy">Buy Entry</option>
+      <option value="buy_tgt">Buy Target</option>
+      <option value="buy_sl">Buy Stoploss</option>
+      <option value="sell">Sell Entry</option>
+      <option value="sell_tgt">Sell Target</option>
+      <option value="sell_sl">Sell Stoploss</option>
     </select>
-    <label>Note</label><input id="alNote" placeholder="optional" />
-    <label>Send to AlgoBot broker on trigger?</label>
-    <select id="alSendBot"><option value="1">Yes — send to connected broker</option><option value="0">No — chart alert only</option></select>
+    <label>Price</label>
+    <input type="number" id="alPriceInput" step="any" style="margin-bottom:6px" />
+    <label>Quantity</label>
+    <input type="number" id="alQty" value="1" min="1" style="margin-bottom:6px" />
+    <label>Order Type</label>
+    <select id="alOrdType" style="margin-bottom:6px">
+      <option value="MARKET">Market Order</option>
+      <option value="LIMIT">Limit Order</option>
+    </select>
+    <label>Note (optional)</label>
+    <input id="alNote" placeholder="e.g. ORB breakout" style="margin-bottom:6px" />
+    <div style="padding:8px 10px;border-radius:7px;background:var(--B)10;border:1px solid var(--B)30;font-size:10px;color:var(--B);margin-bottom:10px">
+      🤖 When price hits this level → AlgoBot places order via connected broker automatically
+    </div>
     <div class="mbtns">
       <button class="mcancel" onclick="closeAlModal()">Cancel</button>
-      <button class="mprimary" onclick="confirmAl()">Create Alert</button>
+      <button class="mprimary" id="alConfirmBtn" onclick="confirmAl()" style="background:var(--G)">✅ Set Alert</button>
     </div>
   </div>
 </div>
@@ -441,12 +458,24 @@ function initChart(){
   });
 
   chart.subscribeClick(p=>{
-    if(!curTool||!p.time)return;
-    const price=cs.coordinateToPrice(p.point.y);
+    if(!curTool)return;
+    // Get price from crosshair data first, fallback to coordinate
+    let price = null;
+    if(p.seriesData && p.seriesData.get(cs)){
+      price = p.seriesData.get(cs).close;
+    }
+    if(!price && p.point){
+      price = cs.coordinateToPrice(p.point.y);
+    }
     if(!price)return;
-    if(curTool==='h') drawHLine(price);
-    else if(curTool==='t') drawHLine(price);
-    else if(curTool==='a'){pendingPrice=price;openAlModal(price);}
+    price = parseFloat(price.toFixed(4));
+    if(curTool==='h'){ drawHLine(price); setTool(null); }
+    else if(curTool==='t'){ drawHLine(price); setTool(null); }
+    else if(curTool==='a'){
+      pendingPrice = price;
+      openAlModal(price);
+      setTool(null); // auto-reset tool after click
+    }
   });
 
   new ResizeObserver(()=>{
@@ -744,35 +773,81 @@ function deleteInd(id){
 // ══════════════════════════════════════════════════════════
 // ALERTS
 // ══════════════════════════════════════════════════════════
+let alSide = 'buy';
+
+function setAlSide(side){
+  alSide = side;
+  const buyBtn  = document.getElementById('alBuyBtn');
+  const sellBtn = document.getElementById('alSellBtn');
+  const confBtn = document.getElementById('alConfirmBtn');
+  const typeSel = document.getElementById('alType');
+  if(side==='buy'){
+    buyBtn.style.background='var(--G)'; buyBtn.style.borderColor='var(--G)'; buyBtn.style.color='#fff';
+    sellBtn.style.background='transparent'; sellBtn.style.borderColor='var(--R)20'; sellBtn.style.color='var(--R)';
+    confBtn.style.background='var(--G)';
+    typeSel.value='buy';
+  } else {
+    sellBtn.style.background='var(--R)'; sellBtn.style.borderColor='var(--R)'; sellBtn.style.color='#fff';
+    buyBtn.style.background='transparent'; buyBtn.style.borderColor='var(--G)20'; buyBtn.style.color='var(--G)';
+    confBtn.style.background='var(--R)';
+    typeSel.value='sell';
+  }
+}
+
 function openAlModal(price){
+  alSide='buy';
   document.getElementById('alPrice').textContent=f(price);
+  document.getElementById('alPriceInput').value=price;
+  document.getElementById('alQty').value=1;
+  document.getElementById('alOrdType').value='MARKET';
+  document.getElementById('alNote').value='';
+  // Reset buttons to BUY selected
+  setAlSide('buy');
   document.getElementById('alModal').classList.add('open');
 }
-function closeAlModal(){document.getElementById('alModal').classList.remove('open');pendingPrice=null;}
+
+function closeAlModal(){
+  document.getElementById('alModal').classList.remove('open');
+  pendingPrice=null;
+}
 
 function confirmAl(){
-  if(!pendingPrice)return;
+  const price = parseFloat(document.getElementById('alPriceInput').value) || pendingPrice;
+  if(!price){showNotif('Enter a price','warn');return;}
+  const qty  = parseInt(document.getElementById('alQty').value)||1;
+  const ordType = document.getElementById('alOrdType').value;
+  const type = document.getElementById('alType').value;
   const a={
-    id:Date.now(),sym:curSym,tf:curTF,price:pendingPrice,
-    type:document.getElementById('alType').value,
-    note:document.getElementById('alNote').value,
-    sendBot:document.getElementById('alSendBot').value==='1',
-    enabled:true,fired:false,
+    id:       Date.now(),
+    sym:      curSym,
+    tf:       curTF,
+    price,
+    type,
+    side:     alSide.toUpperCase(),
+    qty,
+    ordType,
+    note:     document.getElementById('alNote').value,
+    sendBot:  true,
+    enabled:  true,
+    fired:    false,
     createdAt:new Date().toISOString()
   };
-  alerts.push(a);ss('av_al',alerts);
+  alerts.push(a); ss('av_al',alerts);
   addAlertLine(a);
   renderAlList();
   closeAlModal();
+  showNotif(`🔔 Alert set: ${alSide.toUpperCase()} ${curSym} @ ${f(price)} | Qty: ${qty} | ${ordType}`,'success');
 }
 
 function createAlert(isSell){
   const price=parseFloat(document.getElementById('aprice').value);
-  if(!price){alert('Enter price');return;}
-  const type=isSell?'sell':document.getElementById('atype').value;
+  if(!price){showNotif('Enter price','warn');return;}
+  const type = isSell?'sell':document.getElementById('atype').value;
   const a={
     id:Date.now(),sym:curSym,tf:curTF,price,
-    type,note:document.getElementById('anote').value,
+    type, side: isSell?'SELL':'BUY',
+    qty:1, ordType:'MARKET',
+    note:document.getElementById('anote').value,
     sendBot:true,enabled:true,fired:false,
     createdAt:new Date().toISOString()
   };
@@ -780,6 +855,7 @@ function createAlert(isSell){
   addAlertLine(a);
   renderAlList();
   document.getElementById('aprice').value='';
+  showNotif(`🔔 Alert set: ${type.replace('_',' ').toUpperCase()} @ ${f(price)}`,'success');
 }
 
 function addAlertLine(a){
@@ -839,14 +915,15 @@ async function sendToBotBroker(alert,price){
       :'BUY';
 
     const payload={
-      symbol:  alert.sym,
+      symbol:    alert.sym,
       side,
-      price:   price||alert.price,
-      type:    alert.type,
-      tf:      alert.tf||curTF,
-      note:    alert.note||'',
-      qty:     alert.qty||1,
-      source:  'chart',
+      price:     price||alert.price,
+      type:      alert.type,
+      tf:        alert.tf||curTF,
+      note:      alert.note||'',
+      qty:       alert.qty||1,
+      orderType: alert.ordType||'MARKET',
+      source:    'chart',
       timestamp: new Date().toISOString()
     };
 

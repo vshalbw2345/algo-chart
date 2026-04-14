@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALGO_VISH — Live Chart</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {
+    --bg: #0d0f14; --bg2: #13161e; --bg3: #1a1d27; --bg4: #22263a;
+    --border: #2a2f45; --border2: #363b55;
+    --text: #e2e8f0; --text2: #8892aa; --text3: #4a5270;
+    --green: #00d085; --red: #ff4560; --blue: #4c8eff;
+    --purple: #a78bfa; --orange: #f59e0b; --teal: #2dd4bf;
+    --font: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:13px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ── TOP BAR ── */
+  .topbar { display:flex; align-items:center; gap:10px; padding:8px 14px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+  .logo { font-weight:700; font-size:14px; color:var(--blue); letter-spacing:1px; margin-right:6px; }
+  .sym-search { position:relative; }
+  .sym-search input { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:6px; width:180px; font-family:var(--font); font-size:12px; }
+  .sym-dropdown { position:absolute; top:100%; left:0; width:260px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; max-height:260px; overflow-y:auto; z-index:100; display:none; }
+  .sym-dropdown.open { display:block; }
+  .sym-item { padding:8px 12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
+  .sym-item:hover { background:var(--bg4); }
+  .sym-item .name { color:var(--text); font-weight:600; font-size:12px; }
+  .sym-item .exch { color:var(--text2); font-size:10px; }
+
+  /* ── TF BUTTONS ── */
+  .tf-bar { display:flex; gap:3px; }
+  .tf-btn { background:transparent; border:1px solid var(--border); color:var(--text2); padding:4px 9px; border-radius:5px; cursor:pointer; font-size:11px; font-family:var(--font); transition:.15s; }
+  .tf-btn.active, .tf-btn:hover { background:var(--blue); border-color:var(--blue); color:#fff; }
+
+  /* ── TOOL BUTTONS ── */
+  .tool-group { display:flex; gap:3px; border-left:1px solid var(--border); padding-left:10px; }
+  .tool-btn { background:transparent; border:1px solid var(--border); color:var(--text2); padding:4px 8px; border-radius:5px; cursor:pointer; font-size:11px; font-family:var(--font); transition:.15s; display:flex; align-items:center; gap:4px; }
+  .tool-btn.active { background:var(--orange)20; border-color:var(--orange); color:var(--orange); }
+  .tool-btn:hover { border-color:var(--border2); color:var(--text); }
+
+  /* ── PRICE DISPLAY ── */
+  .price-display { margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .cur-price { font-size:18px; font-weight:700; color:var(--text); }
+  .price-change { font-size:12px; }
+  .price-change.up { color:var(--green); }
+  .price-change.dn { color:var(--red); }
+  .orb-display { display:flex; gap:10px; }
+  .orb-level { padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+  .orb-h { background:var(--green)15; color:var(--green); border:1px solid var(--green)40; }
+  .orb-l { background:var(--red)15; color:var(--red); border:1px solid var(--red)40; }
+
+  /* ── MAIN LAYOUT ── */
+  .main { display:flex; flex:1; overflow:hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar { width:220px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; overflow:hidden; }
+  .sidebar-tabs { display:flex; border-bottom:1px solid var(--border); }
+  .stab { flex:1; padding:8px 0; text-align:center; cursor:pointer; font-size:11px; color:var(--text2); border-bottom:2px solid transparent; transition:.15s; }
+  .stab.active { color:var(--blue); border-bottom-color:var(--blue); }
+  .sidebar-content { flex:1; overflow-y:auto; padding:8px; }
+
+  /* Watchlist */
+  .wl-item { padding:8px 10px; border-radius:7px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; border:1px solid transparent; transition:.15s; }
+  .wl-item:hover, .wl-item.active { background:var(--bg3); border-color:var(--border); }
+  .wl-item .sym { font-weight:700; font-size:12px; }
+  .wl-item .px { font-size:11px; }
+  .wl-item .up { color:var(--green); }
+  .wl-item .dn { color:var(--red); }
+  .wl-item .exch-badge { font-size:9px; padding:1px 4px; border-radius:3px; background:var(--bg4); color:var(--text3); margin-left:4px; }
+
+  .add-sym-row { display:flex; gap:5px; margin-bottom:8px; }
+  .add-sym-row input { flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:5px; font-family:var(--font); font-size:11px; }
+  .add-sym-row button { background:var(--blue); border:none; color:#fff; padding:5px 8px; border-radius:5px; cursor:pointer; font-size:11px; }
+
+  /* Indicators */
+  .ind-item { padding:8px 10px; border-radius:7px; background:var(--bg3); margin-bottom:6px; border:1px solid var(--border); }
+  .ind-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .ind-name { font-size:12px; font-weight:600; color:var(--purple); }
+  .ind-actions { display:flex; gap:4px; }
+  .ind-btn { background:transparent; border:1px solid var(--border); color:var(--text2); padding:2px 6px; border-radius:4px; cursor:pointer; font-size:10px; }
+  .ind-btn:hover { border-color:var(--border2); color:var(--text); }
+  .ind-btn.del { border-color:var(--red)40; color:var(--red); }
+
+  /* Alerts */
+  .alert-item { padding:8px 10px; border-radius:7px; margin-bottom:5px; border-left:3px solid; }
+  .alert-item.buy { background:var(--green)08; border-color:var(--green); }
+  .alert-item.sell { background:var(--red)08; border-color:var(--red); }
+  .alert-item.fired { opacity:.5; }
+  .alert-hdr { display:flex; justify-content:space-between; align-items:center; }
+  .alert-sym { font-size:11px; font-weight:700; }
+  .alert-meta { font-size:10px; color:var(--text2); margin-top:3px; }
+  .toggle-sm { width:28px; height:16px; background:var(--border2); border-radius:8px; cursor:pointer; position:relative; transition:.2s; border:none; }
+  .toggle-sm.on { background:var(--green); }
+  .toggle-sm::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; transition:.2s; }
+  .toggle-sm.on::after { left:14px; }
+
+  /* ── CHART AREA ── */
+  .chart-wrap { flex:1; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  #chart { flex:1; }
+
+  /* ── CROSSHAIR INFO ── */
+  .crosshair-info { position:absolute; top:8px; left:8px; background:var(--bg2)ee; border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:11px; pointer-events:none; z-index:10; display:none; }
+  .crosshair-info.show { display:block; }
+  .ci-row { display:flex; gap:10px; }
+  .ci-label { color:var(--text2); }
+  .ci-val { color:var(--text); font-weight:600; }
+  .ci-o { color:var(--blue); }
+  .ci-h { color:var(--green); }
+  .ci-l { color:var(--red); }
+  .ci-c { color:var(--orange); }
+
+  /* ── BOTTOM PANEL ── */
+  .bottom-panel { height:140px; background:var(--bg2); border-top:1px solid var(--border); flex-shrink:0; display:flex; flex-direction:column; }
+  .bp-tabs { display:flex; border-bottom:1px solid var(--border); }
+  .bp-tab { padding:6px 14px; font-size:11px; cursor:pointer; color:var(--text2); border-bottom:2px solid transparent; transition:.15s; }
+  .bp-tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+  .bp-content { flex:1; overflow-y:auto; padding:6px 10px; }
+
+  /* Alert form */
+  .alert-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 10px; border-bottom:1px solid var(--border); }
+  .alert-form label { font-size:11px; color:var(--text2); }
+  .alert-form select, .alert-form input { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:5px; font-family:var(--font); font-size:11px; }
+  .create-btn { background:var(--blue); border:none; color:#fff; padding:5px 12px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:600; font-family:var(--font); }
+  .create-btn:hover { background:#3a7aff; }
+  .create-btn.sell-btn { background:var(--red); }
+
+  /* ── MODALS ── */
+  .modal-overlay { position:fixed; inset:0; background:#00000088; display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:12px; padding:20px; width:480px; max-height:80vh; overflow-y:auto; }
+  .modal h3 { font-size:14px; font-weight:700; color:var(--text); margin-bottom:14px; }
+  .modal label { display:block; font-size:11px; color:var(--text2); margin-bottom:4px; margin-top:10px; }
+  .modal input, .modal select, .modal textarea { width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:6px; font-family:var(--font); font-size:12px; }
+  .modal textarea { height:120px; resize:vertical; }
+  .modal-actions { display:flex; gap:8px; margin-top:16px; }
+  .btn-primary { flex:1; background:var(--blue); border:none; color:#fff; padding:9px; border-radius:7px; cursor:pointer; font-weight:600; font-size:13px; font-family:var(--font); }
+  .btn-cancel { background:transparent; border:1px solid var(--border); color:var(--text2); padding:9px 16px; border-radius:7px; cursor:pointer; font-size:13px; font-family:var(--font); }
+
+  /* Loading */
+  .loading { display:flex; align-items:center; justify-content:center; height:100%; color:var(--text2); font-size:13px; gap:8px; }
+  .spinner { width:16px; height:16px; border:2px solid var(--border2); border-top-color:var(--blue); border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">⚡ ALGO_VISH</div>
+
+  <div class="sym-search" id="symSearch">
+    <input id="symInput" placeholder="Search symbol..." autocomplete="off" oninput="filterSymbols(this.value)" onfocus="showDropdown()" />
+    <div class="sym-dropdown" id="symDropdown"></div>
+  </div>
+
+  <div class="tf-bar">
+    <button class="tf-btn" onclick="setTF('1m')">1M</button>
+    <button class="tf-btn" onclick="setTF('3m')">3M</button>
+    <button class="tf-btn active" onclick="setTF('5m')">5M</button>
+    <button class="tf-btn" onclick="setTF('10m')">10M</button>
+    <button class="tf-btn" onclick="setTF('15m')">15M</button>
+    <button class="tf-btn" onclick="setTF('30m')">30M</button>
+    <button class="tf-btn" onclick="setTF('1h')">1H</button>
+    <button class="tf-btn" onclick="setTF('4h')">4H</button>
+    <button class="tf-btn" onclick="setTF('1d')">1D</button>
+  </div>
+
+  <div class="tool-group">
+    <button class="tool-btn" id="toolH" onclick="setTool('hline')" title="Horizontal Line">— H-Line</button>
+    <button class="tool-btn" id="toolT" onclick="setTool('tline')" title="Trend Line">/ T-Line</button>
+    <button class="tool-btn" id="toolA" onclick="setTool('alert')" title="Alert Line">🔔 Alert</button>
+    <button class="tool-btn" onclick="clearDrawings()">✕ Clear</button>
+  </div>
+
+  <div class="price-display">
+    <div class="orb-display" id="orbDisplay" style="display:none">
+      <span class="orb-level orb-h" id="orbH">ORB H —</span>
+      <span class="orb-level orb-l" id="orbL">ORB L —</span>
+    </div>
+    <div>
+      <div class="cur-price" id="curPrice">—</div>
+      <div class="price-change" id="priceChange">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="stab active" onclick="showSTab('watchlist',this)">Watchlist</div>
+      <div class="stab" onclick="showSTab('indicators',this)">Indicators</div>
+      <div class="stab" onclick="showSTab('alerts',this)">Alerts</div>
+    </div>
+    <div class="sidebar-content">
+      <!-- WATCHLIST -->
+      <div id="tab-watchlist">
+        <div class="add-sym-row">
+          <input id="addSymInput" placeholder="e.g. BTCUSDT, RELIANCE" onkeydown="if(event.key==='Enter')addSymbol()" />
+          <button onclick="addSymbol()">+</button>
+        </div>
+        <div id="watchlistEl"></div>
+      </div>
+
+      <!-- INDICATORS -->
+      <div id="tab-indicators" style="display:none">
+        <button class="tool-btn" style="width:100%;justify-content:center;margin-bottom:8px;padding:7px" onclick="openIndModal()">+ Add Indicator</button>
+        <div id="indicatorsList"></div>
+      </div>
+
+      <!-- ALERTS -->
+      <div id="tab-alerts" style="display:none">
+        <div id="alertsList"></div>
+        <div style="color:var(--text3);font-size:11px;text-align:center;padding:16px" id="noAlerts">No alerts yet. Use the 🔔 Alert Line tool or create below.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART AREA -->
+  <div class="chart-wrap">
+    <div id="chart"></div>
+    <div class="crosshair-info" id="crosshairInfo">
+      <div class="ci-row">
+        <span class="ci-label">O</span><span class="ci-val ci-o" id="ciO">—</span>
+        <span class="ci-label">H</span><span class="ci-val ci-h" id="ciH">—</span>
+        <span class="ci-label">L</span><span class="ci-val ci-l" id="ciL">—</span>
+        <span class="ci-label">C</span><span class="ci-val ci-c" id="ciC">—</span>
+      </div>
+    </div>
+    <!-- BOTTOM PANEL -->
+    <div class="bottom-panel">
+      <div class="bp-tabs">
+        <div class="bp-tab active" onclick="showBTab('create-alert',this)">🔔 Create Alert</div>
+        <div class="bp-tab" onclick="showBTab('fired-alerts',this)">📋 Fired Alerts</div>
+      </div>
+      <div class="bp-content">
+        <div id="bpanel-create-alert">
+          <div class="alert-form">
+            <label>Type:</label>
+            <select id="alertType">
+              <option value="buy">Buy</option>
+              <option value="sell">Sell</option>
+              <option value="buy_sl">Buy Stoploss</option>
+              <option value="buy_tgt">Buy Target</option>
+              <option value="sell_sl">Sell Stoploss</option>
+              <option value="sell_tgt">Sell Target</option>
+            </select>
+            <label>Price:</label>
+            <input type="number" id="alertPrice" placeholder="0.00" step="0.01" style="width:100px" />
+            <label>TF:</label>
+            <span id="alertTFDisplay" style="color:var(--blue);font-weight:700;font-size:11px">5M</span>
+            <label>Note:</label>
+            <input id="alertNote" placeholder="Optional note" style="width:140px" />
+            <button class="create-btn" onclick="createManualAlert('buy')">▲ BUY Alert</button>
+            <button class="create-btn sell-btn" onclick="createManualAlert('sell')">▼ SELL Alert</button>
+          </div>
+        </div>
+        <div id="bpanel-fired-alerts" style="display:none">
+          <div id="firedAlertsList" style="color:var(--text2);font-size:11px;padding:8px">No fired alerts yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD INDICATOR MODAL -->
+<div class="modal-overlay" id="indModal">
+  <div class="modal">
+    <h3>Add Indicator</h3>
+    <label>Indicator Name</label>
+    <input id="indName" placeholder="e.g. My RSI Indicator" />
+    <label>Pine Script / Logic Description</label>
+    <textarea id="indScript" placeholder="Paste your Pine Script indicator here...&#10;&#10;e.g.&#10;//@version=5&#10;indicator('RSI', overlay=false)&#10;rsi = ta.rsi(close, 14)&#10;plot(rsi)"></textarea>
+    <label>Color</label>
+    <input type="color" id="indColor" value="#a78bfa" style="width:60px;height:32px;padding:2px" />
+    <label>Show on Chart</label>
+    <select id="indVisible"><option value="1">Visible</option><option value="0">Hidden</option></select>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeIndModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveIndicator()">Save Indicator</button>
+    </div>
+  </div>
+</div>
+
+<!-- ALERT LINE MODAL -->
+<div class="modal-overlay" id="alertLineModal">
+  <div class="modal">
+    <h3>🔔 Create Alert at this Price</h3>
+    <div style="font-size:22px;font-weight:700;color:var(--orange);margin-bottom:12px" id="alertLinePrice">₹ —</div>
+    <label>Alert Type</label>
+    <select id="alertLineType">
+      <option value="buy">Buy Signal</option>
+      <option value="sell">Sell Signal</option>
+      <option value="buy_sl">Buy Stoploss Hit</option>
+      <option value="buy_tgt">Buy Target Hit</option>
+      <option value="sell_sl">Sell Stoploss Hit</option>
+      <option value="sell_tgt">Sell Target Hit</option>
+    </select>
+    <label>Note</label>
+    <input id="alertLineNote" placeholder="Optional description" />
+    <label>Timeframe: <span style="color:var(--blue)" id="alertLineTF">5M</span></label>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAlertLineModal()">Cancel</button>
+      <button class="btn-primary" onclick="confirmAlertLine()">Create Alert</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let chart, candleSeries, volumeSeries;
+let currentSymbol = 'BTCUSDT';
+let currentTF     = '5m';
+let currentTool   = null;
+let drawings      = [];
+let indicators    = JSON.parse(localStorage.getItem('av_indicators') || '[]');
+let alerts        = JSON.parse(localStorage.getItem('av_alerts') || '[]');
+let firedAlerts   = JSON.parse(localStorage.getItem('av_fired') || '[]');
+let watchlist     = JSON.parse(localStorage.getItem('av_watchlist') || '["BTCUSDT","ETHUSDT","SOLUSDT"]');
+let liveData      = {}; // symbol → last price
+let pendingAlertPrice = null;
+let orbHigh = null, orbLow = null;
+let priceLineMap = {}; // alert id → priceLine
+
+// ─────────────────────────────────────────────
+// SYMBOL CONFIG
+// ─────────────────────────────────────────────
+const INDIAN_STOCKS = [
+  {s:'RELIANCE.NS',label:'RELIANCE',name:'Reliance Industries',exch:'NSE'},
+  {s:'TCS.NS',label:'TCS',name:'Tata Consultancy Services',exch:'NSE'},
+  {s:'HDFCBANK.NS',label:'HDFCBANK',name:'HDFC Bank',exch:'NSE'},
+  {s:'INFY.NS',label:'INFY',name:'Infosys',exch:'NSE'},
+  {s:'ICICIBANK.NS',label:'ICICIBANK',name:'ICICI Bank',exch:'NSE'},
+  {s:'SBIN.NS',label:'SBIN',name:'State Bank of India',exch:'NSE'},
+  {s:'TATAMOTORS.NS',label:'TATAMOTORS',name:'Tata Motors',exch:'NSE'},
+  {s:'BAJFINANCE.NS',label:'BAJFINANCE',name:'Bajaj Finance',exch:'NSE'},
+  {s:'JUBLFOOD.NS',label:'JUBLFOOD',name:'Jubilant FoodWorks',exch:'NSE'},
+  {s:'ZOMATO.NS',label:'ZOMATO',name:'Zomato',exch:'NSE'},
+  {s:'ADANIPORTS.NS',label:'ADANIPORTS',name:'Adani Ports',exch:'NSE'},
+  {s:'AXISBANK.NS',label:'AXISBANK',name:'Axis Bank',exch:'NSE'},
+  {s:'SUNPHARMA.NS',label:'SUNPHARMA',name:'Sun Pharma',exch:'NSE'},
+  {s:'BEL.NS',label:'BEL',name:'Bharat Electronics',exch:'NSE'},
+  {s:'HAL.NS',label:'HAL',name:'Hindustan Aeronautics',exch:'NSE'},
+  {s:'IRCTC.NS',label:'IRCTC',name:'IRCTC',exch:'NSE'},
+];
+
+const CRYPTO_SYMBOLS = [
+  {s:'BTCUSDT',label:'BTCUSDT',name:'Bitcoin',exch:'BINANCE'},
+  {s:'ETHUSDT',label:'ETHUSDT',name:'Ethereum',exch:'BINANCE'},
+  {s:'SOLUSDT',label:'SOLUSDT',name:'Solana',exch:'BINANCE'},
+  {s:'BNBUSDT',label:'BNBUSDT',name:'BNB',exch:'BINANCE'},
+  {s:'XRPUSDT',label:'XRPUSDT',name:'XRP',exch:'BINANCE'},
+  {s:'DOGEUSDT',label:'DOGEUSDT',name:'Dogecoin',exch:'BINANCE'},
+  {s:'ADAUSDT',label:'ADAUSDT',name:'Cardano',exch:'BINANCE'},
+  {s:'AVAXUSDT',label:'AVAXUSDT',name:'Avalanche',exch:'BINANCE'},
+  {s:'MATICUSDT',label:'MATICUSDT',name:'Polygon',exch:'BINANCE'},
+  {s:'LINKUSDT',label:'LINKUSDT',name:'Chainlink',exch:'BINANCE'},
+];
+
+const ALL_SYMBOLS = [...INDIAN_STOCKS, ...CRYPTO_SYMBOLS];
+
+function isIndian(sym) { return sym.endsWith('.NS') || sym.endsWith('.BSE'); }
+function isCrypto(sym) { return !isIndian(sym); }
+
+// ─────────────────────────────────────────────
+// CHART INIT
+// ─────────────────────────────────────────────
+function initChart() {
+  const el = document.getElementById('chart');
+  chart = LightweightCharts.createChart(el, {
+    layout: { background:{color:'#0d0f14'}, textColor:'#8892aa' },
+    grid:   { vertLines:{color:'#1a1d27'}, horzLines:{color:'#1a1d27'} },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor:'#2a2f45' },
+    timeScale: { borderColor:'#2a2f45', timeVisible:true, secondsVisible:false },
+    handleScroll: true,
+    handleScale:  true,
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor:'#00d085', downColor:'#ff4560',
+    borderUpColor:'#00d085', borderDownColor:'#ff4560',
+    wickUpColor:'#00d085', wickDownColor:'#ff4560',
+  });
+
+  volumeSeries = chart.addHistogramSeries({
+    color:'#4c8eff', priceFormat:{type:'volume'},
+    priceScaleId:'', scaleMargins:{top:.85, bottom:0},
+  });
+
+  // Crosshair info
+  chart.subscribeCrosshairMove(p => {
+    if (!p.time || !p.seriesData) return;
+    const d = p.seriesData.get(candleSeries);
+    if (!d) return;
+    const el = document.getElementById('crosshairInfo');
+    el.classList.add('show');
+    document.getElementById('ciO').textContent = fmt(d.open);
+    document.getElementById('ciH').textContent = fmt(d.high);
+    document.getElementById('ciL').textContent = fmt(d.low);
+    document.getElementById('ciC').textContent = fmt(d.close);
+  });
+
+  // Click for drawing tools
+  chart.subscribeClick(p => {
+    if (!currentTool || !p.time) return;
+    const price = candleSeries.coordinateToPrice(p.point.y);
+    if (!price) return;
+    if (currentTool === 'hline') addHLine(price);
+    else if (currentTool === 'tline') addTLine(p.time, price);
+    else if (currentTool === 'alert') { pendingAlertPrice = price; openAlertLineModal(price); }
+  });
+
+  // Resize
+  new ResizeObserver(() => {
+    chart.applyOptions({ width: el.clientWidth, height: el.clientHeight - 140 });
+  }).observe(el.parentElement);
+}
+
+function fmt(n) {
+  if (!n) return '—';
+  return n >= 1000 ? n.toFixed(2) : n >= 1 ? n.toFixed(4) : n.toFixed(6);
+}
+
+// ─────────────────────────────────────────────
+// DATA FETCHING
+// ─────────────────────────────────────────────
+const TF_BINANCE = { '1m':'1m','3m':'3m','5m':'5m','10m':'1m','15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d' };
+const TF_YAHOO   = { '1m':'1m','3m':'2m','5m':'5m','10m':'5m','15m':'15m','30m':'30m','1h':'60m','4h':'60m','1d':'1d' };
+const TF_RANGE   = { '1m':'1d','3m':'1d','5m':'5d','10m':'5d','15m':'5d','30m':'30d','1h':'60d','4h':'60d','1d':'1y' };
+
+async function loadCandles(symbol, tf) {
+  showLoading(true);
+  try {
+    let candles;
+    if (isCrypto(symbol)) {
+      candles = await fetchBinance(symbol, tf);
+    } else {
+      candles = await fetchYahoo(symbol, tf);
+    }
+    if (candles && candles.length > 0) {
+      candleSeries.setData(candles);
+      volumeSeries.setData(candles.map(c=>({time:c.time, value:c.volume||0, color:c.close>=c.open?'#00d08520':'#ff456020'})));
+      computeORB(candles);
+      checkAlerts(candles);
+      chart.timeScale().fitContent();
+      updatePriceDisplay(candles[candles.length-1], candles[candles.length-2]);
+    }
+  } catch(e) { console.error('Load error:', e); }
+  showLoading(false);
+}
+
+async function fetchBinance(symbol, tf) {
+  const itv = TF_BINANCE[tf] || tf;
+  const limit = tf === '1d' ? 365 : tf === '4h' ? 200 : 500;
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${itv}&limit=${limit}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  return d.map(k => ({
+    time:   Math.floor(k[0]/1000),
+    open:   parseFloat(k[1]),
+    high:   parseFloat(k[2]),
+    low:    parseFloat(k[3]),
+    close:  parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
+}
+
+async function fetchYahoo(symbol, tf) {
+  const itv   = TF_YAHOO[tf]  || '5m';
+  const range = TF_RANGE[tf]  || '5d';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${itv}&range=${range}&includePrePost=false`;
+  const r = await fetch(url, { headers:{'User-Agent':'Mozilla/5.0'} });
+  const d = await r.json();
+  const res   = d.chart?.result?.[0];
+  if (!res) return [];
+  const ts    = res.timestamps || res.timestamp || [];
+  const q     = res.indicators?.quote?.[0] || {};
+  const opens = q.open  || [], highs = q.high || [], lows = q.low || [],
+        closes= q.close || [], vols  = q.volume || [];
+  const candles = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (!closes[i] || !opens[i]) continue;
+    candles.push({
+      time:   ts[i],
+      open:   opens[i], high: highs[i], low: lows[i], close: closes[i],
+      volume: vols[i] || 0,
+    });
+  }
+  return candles;
+}
+
+// ─────────────────────────────────────────────
+// ORB COMPUTATION (9:15-9:20 IST)
+// ─────────────────────────────────────────────
+function computeORB(candles) {
+  if (isCrypto(currentSymbol)) { hideORB(); return; }
+  const today = new Date().toDateString();
+  const orbCandles = candles.filter(c => {
+    const d = new Date(c.time * 1000);
+    if (d.toDateString() !== today) return false;
+    const h = d.getHours(), m = d.getMinutes();
+    const ist = h * 60 + m + 330; // approx IST
+    const istMins = ist % (24*60);
+    return istMins >= 555 && istMins < 560; // 9:15-9:20 IST
+  });
+  if (!orbCandles.length) { hideORB(); return; }
+  orbHigh = Math.max(...orbCandles.map(c=>c.high));
+  orbLow  = Math.min(...orbCandles.map(c=>c.low));
+  document.getElementById('orbH').textContent = `ORB H ${fmt(orbHigh)}`;
+  document.getElementById('orbL').textContent = `ORB L ${fmt(orbLow)}`;
+  document.getElementById('orbDisplay').style.display = 'flex';
+  // Draw ORB lines
+  candleSeries.createPriceLine({ price:orbHigh, color:'#00d085', lineWidth:2, lineStyle:LightweightCharts.LineStyle.Dashed, title:'ORB H' });
+  candleSeries.createPriceLine({ price:orbLow,  color:'#ff4560', lineWidth:2, lineStyle:LightweightCharts.LineStyle.Dashed, title:'ORB L' });
+}
+function hideORB() {
+  orbHigh = orbLow = null;
+  document.getElementById('orbDisplay').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
+// PRICE DISPLAY
+// ─────────────────────────────────────────────
+function updatePriceDisplay(last, prev) {
+  if (!last) return;
+  document.getElementById('curPrice').textContent = fmt(last.close);
+  if (prev) {
+    const chg = last.close - prev.close;
+    const pct = (chg/prev.close*100).toFixed(2);
+    const el = document.getElementById('priceChange');
+    el.textContent = `${chg>=0?'+':''}${fmt(chg)} (${chg>=0?'+':''}${pct}%)`;
+    el.className = 'price-change ' + (chg>=0?'up':'dn');
+  }
+}
+
+// ─────────────────────────────────────────────
+// DRAWING TOOLS
+// ─────────────────────────────────────────────
+function setTool(t) {
+  currentTool = currentTool === t ? null : t;
+  ['toolH','toolT','toolA'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  if (currentTool === 'hline') document.getElementById('toolH').classList.add('active');
+  if (currentTool === 'tline') document.getElementById('toolT').classList.add('active');
+  if (currentTool === 'alert') document.getElementById('toolA').classList.add('active');
+  document.getElementById('chart').style.cursor = currentTool ? 'crosshair' : 'default';
+}
+
+function addHLine(price) {
+  const line = candleSeries.createPriceLine({ price, color:'#4c8eff', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Solid, title:`H ${fmt(price)}` });
+  drawings.push({ type:'hline', price, line });
+}
+
+function addTLine(time, price) {
+  // Store trendline points (simplified as horizontal for now)
+  addHLine(price);
+}
+
+function clearDrawings() {
+  drawings.forEach(d => { try { candleSeries.removePriceLine(d.line); } catch(e){} });
+  drawings = [];
+}
+
+// ─────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────
+function openAlertLineModal(price) {
+  document.getElementById('alertLinePrice').textContent = `₹ ${fmt(price)}`;
+  document.getElementById('alertLineTF').textContent = currentTF.toUpperCase();
+  document.getElementById('alertLineModal').classList.add('open');
+}
+function closeAlertLineModal() { document.getElementById('alertLineModal').classList.remove('open'); pendingAlertPrice=null; }
+
+function confirmAlertLine() {
+  if (!pendingAlertPrice) return;
+  const type = document.getElementById('alertLineType').value;
+  const note = document.getElementById('alertLineNote').value;
+  createAlert({ type, price: pendingAlertPrice, note, tf: currentTF, symbol: currentSymbol, source:'line' });
+  closeAlertLineModal();
+  // Add visual line on chart
+  const colors = { buy:'#00d085', sell:'#ff4560', buy_sl:'#ff4560', buy_tgt:'#00d085', sell_sl:'#00d085', sell_tgt:'#ff4560' };
+  const pl = candleSeries.createPriceLine({ price:pendingAlertPrice, color:colors[type]||'#f59e0b', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, title:`🔔 ${type.toUpperCase()}` });
+  drawings.push({ type:'alert', price:pendingAlertPrice, line:pl });
+}
+
+function createManualAlert(direction) {
+  const price = parseFloat(document.getElementById('alertPrice').value);
+  if (!price) { alert('Enter a price first'); return; }
+  const type = document.getElementById('alertType').value;
+  const note = document.getElementById('alertNote').value;
+  createAlert({ type, price, note, tf: currentTF, symbol: currentSymbol, source:'manual' });
+  document.getElementById('alertPrice').value = '';
+}
+
+function createAlert(data) {
+  const a = { ...data, id: Date.now(), enabled: true, fired: false, createdAt: new Date().toISOString() };
+  alerts.push(a);
+  saveAlerts();
+  renderAlerts();
+  // Add price line
+  const colors = { buy:'#00d085', sell:'#ff4560', buy_sl:'#ff4560', buy_tgt:'#00d085', sell_sl:'#00d085', sell_tgt:'#ff4560' };
+  const pl = candleSeries.createPriceLine({ price:a.price, color:colors[a.type]||'#f59e0b', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, title:`🔔 ${a.type.toUpperCase()} @${fmt(a.price)}` });
+  priceLineMap[a.id] = pl;
+}
+
+function saveAlerts() { localStorage.setItem('av_alerts', JSON.stringify(alerts)); }
+
+function toggleAlert(id) {
+  const a = alerts.find(x=>x.id===id);
+  if (a) { a.enabled = !a.enabled; saveAlerts(); renderAlerts(); }
+}
+
+function deleteAlert(id) {
+  const pl = priceLineMap[id];
+  if (pl) { try { candleSeries.removePriceLine(pl); } catch(e){} }
+  delete priceLineMap[id];
+  alerts = alerts.filter(a=>a.id!==id);
+  saveAlerts();
+  renderAlerts();
+}
+
+function checkAlerts(candles) {
+  const last = candles[candles.length-1];
+  if (!last) return;
+  alerts.filter(a=>a.enabled&&!a.fired&&a.symbol===currentSymbol).forEach(a=>{
+    const triggered = (a.type==='buy'||a.type==='buy_tgt') ? last.close >= a.price
+      : (a.type==='sell'||a.type==='sell_tgt') ? last.close <= a.price
+      : (a.type==='buy_sl') ? last.close <= a.price
+      : (a.type==='sell_sl') ? last.close >= a.price
+      : false;
+    if (triggered) {
+      a.fired = true;
+      a.firedAt = new Date().toISOString();
+      firedAlerts.unshift({ ...a });
+      localStorage.setItem('av_fired', JSON.stringify(firedAlerts.slice(0,50)));
+      saveAlerts();
+      renderAlerts();
+      renderFiredAlerts();
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// INDICATORS
+// ─────────────────────────────────────────────
+function openIndModal() { document.getElementById('indModal').classList.add('open'); }
+function closeIndModal() { document.getElementById('indModal').classList.remove('open'); }
+
+function saveIndicator() {
+  const name   = document.getElementById('indName').value.trim();
+  const script = document.getElementById('indScript').value.trim();
+  const color  = document.getElementById('indColor').value;
+  const vis    = document.getElementById('indVisible').value === '1';
+  if (!name) { alert('Enter indicator name'); return; }
+  indicators.push({ id: Date.now(), name, script, color, visible: vis });
+  localStorage.setItem('av_indicators', JSON.stringify(indicators));
+  renderIndicators();
+  closeIndModal();
+  document.getElementById('indName').value = '';
+  document.getElementById('indScript').value = '';
+}
+
+function deleteIndicator(id) {
+  indicators = indicators.filter(i=>i.id!==id);
+  localStorage.setItem('av_indicators', JSON.stringify(indicators));
+  renderIndicators();
+}
+
+function toggleIndicator(id) {
+  const ind = indicators.find(i=>i.id===id);
+  if (ind) { ind.visible = !ind.visible; localStorage.setItem('av_indicators', JSON.stringify(indicators)); renderIndicators(); }
+}
+
+// ─────────────────────────────────────────────
+// WATCHLIST
+// ─────────────────────────────────────────────
+function addSymbol() {
+  let sym = document.getElementById('addSymInput').value.trim().toUpperCase();
+  if (!sym) return;
+  // Auto-append .NS for Indian-looking symbols
+  if (!sym.includes('.') && !sym.endsWith('USDT') && !sym.endsWith('BTC') && sym.length < 8) sym += '.NS';
+  if (!watchlist.includes(sym)) { watchlist.push(sym); localStorage.setItem('av_watchlist', JSON.stringify(watchlist)); }
+  document.getElementById('addSymInput').value = '';
+  renderWatchlist();
+  loadSymbol(sym);
+}
+
+function removeFromWatchlist(sym) {
+  watchlist = watchlist.filter(s=>s!==sym);
+  localStorage.setItem('av_watchlist', JSON.stringify(watchlist));
+  renderWatchlist();
+}
+
+function loadSymbol(sym) {
+  currentSymbol = sym;
+  document.getElementById('symInput').value = sym;
+  document.querySelectorAll('.wl-item').forEach(el=>el.classList.toggle('active', el.dataset.sym===sym));
+  loadCandles(sym, currentTF);
+}
+
+// ─────────────────────────────────────────────
+// SYMBOL SEARCH DROPDOWN
+// ─────────────────────────────────────────────
+function filterSymbols(q) {
+  const dd = document.getElementById('symDropdown');
+  q = q.trim().toUpperCase();
+  if (!q) { dd.classList.remove('open'); return; }
+  const matches = ALL_SYMBOLS.filter(s=>s.label.includes(q)||s.name.toUpperCase().includes(q)).slice(0,10);
+  dd.innerHTML = matches.map(s=>`
+    <div class="sym-item" onclick="selectSym('${s.s}')">
+      <div><div class="name">${s.label}</div><div class="exch">${s.name}</div></div>
+      <span class="exch" style="color:var(--text3)">${s.exch}</span>
+    </div>`).join('');
+  dd.classList.toggle('open', matches.length > 0);
+}
+
+function showDropdown() { if (document.getElementById('symInput').value) filterSymbols(document.getElementById('symInput').value); }
+
+function selectSym(sym) {
+  document.getElementById('symDropdown').classList.remove('open');
+  document.getElementById('symInput').value = sym;
+  if (!watchlist.includes(sym)) { watchlist.push(sym); localStorage.setItem('av_watchlist', JSON.stringify(watchlist)); renderWatchlist(); }
+  loadSymbol(sym);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#symSearch')) document.getElementById('symDropdown').classList.remove('open');
+});
+
+// ─────────────────────────────────────────────
+// TF CHANGE
+// ─────────────────────────────────────────────
+function setTF(tf) {
+  currentTF = tf;
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase()===tf.replace('m','m')||b.textContent.toLowerCase()===tf));
+  document.querySelectorAll('.tf-btn').forEach(b=>{ if(b.onclick.toString().includes(`'${tf}'`)) b.classList.add('active'); else b.classList.remove('active'); });
+  document.getElementById('alertTFDisplay').textContent = tf.toUpperCase();
+  document.getElementById('alertLineTF').textContent = tf.toUpperCase();
+  loadCandles(currentSymbol, tf);
+}
+
+// ─────────────────────────────────────────────
+// RENDER FUNCTIONS
+// ─────────────────────────────────────────────
+function renderWatchlist() {
+  const el = document.getElementById('watchlistEl');
+  el.innerHTML = watchlist.map(sym=>{
+    const info = ALL_SYMBOLS.find(s=>s.s===sym||s.label===sym);
+    const px = liveData[sym] ? fmt(liveData[sym]) : '—';
+    return `<div class="wl-item ${sym===currentSymbol?'active':''}" data-sym="${sym}" onclick="loadSymbol('${sym}')">
+      <div>
+        <span class="sym">${info?.label||sym}</span>
+        <span class="exch-badge">${info?.exch||'NSE'}</span>
+        ${info?.name?`<div style="font-size:10px;color:var(--text3);margin-top:2px">${info.name}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div class="px">${px}</div>
+        <div style="font-size:9px;color:var(--text3);cursor:pointer" onclick="event.stopPropagation();removeFromWatchlist('${sym}')">✕ remove</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderIndicators() {
+  const el = document.getElementById('indicatorsList');
+  el.innerHTML = indicators.length === 0
+    ? '<div style="color:var(--text3);font-size:11px;text-align:center;padding:12px">No indicators added</div>'
+    : indicators.map(i=>`
+      <div class="ind-item">
+        <div class="ind-header">
+          <div class="ind-name" style="color:${i.color}">${i.name}</div>
+          <div class="ind-actions">
+            <button class="ind-btn" onclick="toggleIndicator(${i.id})">${i.visible?'👁 Hide':'👁 Show'}</button>
+            <button class="ind-btn del" onclick="deleteIndicator(${i.id})">✕</button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text3)">${i.script.substring(0,60)}${i.script.length>60?'...':''}</div>
+      </div>`).join('');
+}
+
+function renderAlerts() {
+  const el    = document.getElementById('alertsList');
+  const noEl  = document.getElementById('noAlerts');
+  const symAlerts = alerts.filter(a=>a.symbol===currentSymbol);
+  noEl.style.display = symAlerts.length ? 'none' : 'block';
+  const colors = { buy:'var(--green)', sell:'var(--red)', buy_sl:'var(--red)', buy_tgt:'var(--green)', sell_sl:'var(--green)', sell_tgt:'var(--red)' };
+  el.innerHTML = symAlerts.map(a=>`
+    <div class="alert-item ${a.type.includes('buy')?'buy':'sell'} ${a.fired?'fired':''}">
+      <div class="alert-hdr">
+        <span class="alert-sym" style="color:${colors[a.type]||'var(--orange)'}">
+          ${a.type.toUpperCase().replace('_',' ')} @ ${fmt(a.price)}
+        </span>
+        <div style="display:flex;gap:5px;align-items:center">
+          <button class="toggle-sm ${a.enabled&&!a.fired?'on':''}" onclick="toggleAlert(${a.id})"></button>
+          <button class="ind-btn del" onclick="deleteAlert(${a.id})">✕</button>
+        </div>
+      </div>
+      <div class="alert-meta">${a.tf?.toUpperCase()||'5M'} · ${a.note||''} ${a.fired?'✅ FIRED':''}</div>
+    </div>`).join('');
+}
+
+function renderFiredAlerts() {
+  const el = document.getElementById('firedAlertsList');
+  if (!firedAlerts.length) { el.textContent = 'No fired alerts yet'; return; }
+  el.innerHTML = firedAlerts.slice(0,20).map(a=>`
+    <div style="padding:6px 8px;border-radius:6px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border)">
+      <div style="color:${a.type.includes('buy')?'var(--green)':'var(--red)'};font-weight:700;font-size:11px">
+        ${a.symbol} — ${a.type.toUpperCase().replace('_',' ')} @ ${fmt(a.price)}
+      </div>
+      <div style="font-size:10px;color:var(--text2)">${a.tf?.toUpperCase()} · ${new Date(a.firedAt||a.createdAt).toLocaleString('en-IN')}</div>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────
+function showSTab(id, el) {
+  ['watchlist','indicators','alerts'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = t===id?'block':'none';
+  });
+  document.querySelectorAll('.stab').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  if (id==='alerts') renderAlerts();
+  if (id==='indicators') renderIndicators();
+}
+
+function showBTab(id, el) {
+  ['create-alert','fired-alerts'].forEach(t=>{
+    document.getElementById('bpanel-'+t).style.display = t===id?'block':'none';
+  });
+  document.querySelectorAll('.bp-tab').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  if (id==='fired-alerts') renderFiredAlerts();
+}
+
+// ─────────────────────────────────────────────
+// LOADING STATE
+// ─────────────────────────────────────────────
+function showLoading(show) {
+  let el = document.getElementById('loadingEl');
+  if (show) {
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loadingEl';
+      el.className = 'loading';
+      el.style.cssText = 'position:absolute;inset:0;z-index:5;pointer-events:none';
+      el.innerHTML = '<div class="spinner"></div><span>Loading chart data...</span>';
+      document.querySelector('.chart-wrap').appendChild(el);
+    }
+    el.style.display = 'flex';
+  } else if (el) { el.style.display = 'none'; }
+}
+
+// ─────────────────────────────────────────────
+// LIVE PRICE UPDATES (Binance WebSocket)
+// ─────────────────────────────────────────────
+let ws = null;
+function connectLiveFeed() {
+  const cryptoSyms = watchlist.filter(isCrypto).map(s=>s.toLowerCase()+'@miniTicker');
+  if (!cryptoSyms.length) return;
+  if (ws) ws.close();
+  ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${cryptoSyms.join('/')}`);
+  ws.onmessage = e => {
+    const d = JSON.parse(e.data).data;
+    if (!d) return;
+    const sym = d.s;
+    liveData[sym] = parseFloat(d.c);
+    // Update watchlist price
+    const items = document.querySelectorAll(`.wl-item[data-sym="${sym}"] .px`);
+    items.forEach(el => el.textContent = fmt(liveData[sym]));
+    // Update current price if viewing this symbol
+    if (sym === currentSymbol) {
+      document.getElementById('curPrice').textContent = fmt(liveData[sym]);
+    }
+  };
+  ws.onerror = () => setTimeout(connectLiveFeed, 5000);
+  ws.onclose = () => setTimeout(connectLiveFeed, 5000);
+}
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+function boot() {
+  initChart();
+  renderWatchlist();
+  renderIndicators();
+  renderAlerts();
+  loadSymbol(currentSymbol);
+  connectLiveFeed();
+
+  // Restore price lines for existing alerts
+  alerts.filter(a=>!a.fired&&a.symbol===currentSymbol).forEach(a=>{
+    const colors = { buy:'#00d085', sell:'#ff4560', buy_sl:'#ff4560', buy_tgt:'#00d085', sell_sl:'#00d085', sell_tgt:'#ff4560' };
+    const pl = candleSeries.createPriceLine({ price:a.price, color:colors[a.type]||'#f59e0b', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dotted, title:`🔔 ${a.type.toUpperCase()}` });
+    priceLineMap[a.id] = pl;
+  });
+}
+
+window.onload = boot;
+</script>
+</body>
+</html>

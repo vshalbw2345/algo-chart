@@ -1,0 +1,11 @@
+{
+  "name": "algo-chart",
+  "version": "1.0.0",
+  "main": "server_chart.js",
+  "scripts": {
+    "start": "node server_chart.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

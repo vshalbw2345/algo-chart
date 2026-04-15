@@ -481,7 +481,7 @@ let lsMode='long';
 function ls(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function ss(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
-let watchlist  = ls('av_wl')    || ['BTCUSDT','ETHUSDT','SOLUSDT','RELIANCE.NS','SBIN.NS'];
+let watchlist  = ls('av_wl')    || ['BTCUSDT','ETHUSDT','SOLUSDT'];
 let indicators = ls('av_ind')   || [];
 let alerts     = ls('av_al')    || [];
 let fired      = ls('av_fired') || [];
@@ -602,6 +602,11 @@ function initChart(){
   }).observe(el.parentElement);
   initCv();
   if(isLight)applyTheme();
+  // Force initial size
+  const cel=document.getElementById('chart');
+  const h=Math.max(300,cel.parentElement.clientHeight-40);
+  chart.applyOptions({width:cel.clientWidth||window.innerWidth-210,height:h});
+  resizeCv();
 }
 const f=n=>n==null?'—':n>=10000?n.toFixed(2):n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
 
@@ -1415,7 +1420,7 @@ function addSym(){
   if(!watchlist.includes(s))watchlist.push(s);
   ss('av_wl',watchlist);document.getElementById('addIn').value='';renderWl();loadSym(s);
 }
-function removeSym(s,e){e.stopPropagation();watchlist=watchlist.filter(x=>x!==s);ss('av_wl',watchlist);renderWl();}
+function removeSym(s){watchlist=watchlist.filter(x=>x!==s);ss('av_wl',watchlist);renderWl();}
 function loadSym(s){
   curSym=s;document.getElementById('si').value=s;
   document.getElementById('apSym').textContent=s;
@@ -1447,17 +1452,19 @@ function setTF(tf){
 
 // ══════════════════════════════ RENDER ══════════════════════════════════════
 function renderWl(){
-  document.getElementById('wlEl').innerHTML=watchlist.map(s=>{
+  const wlEl=document.getElementById('wlEl');
+  if(!wlEl)return;
+  wlEl.innerHTML=watchlist.map(s=>{
     const info=ALL.find(x=>x.s===s||x.l===s);
-    return`<div class="wr ${s===curSym?'on':''}" data-s="${s}" onclick="loadSym('${s}')">
-      <div><span class="wsym">${info?.l||s}</span><span class="wex">${info?.e||'NSE'}</span>
-        ${info?.n?`<div style="font-size:9px;color:var(--t3);margin-top:1px">${info.n}</div>`:''}
-      </div>
-      <div style="text-align:right">
-        <div class="wpx" style="font-size:11px">${liveData[s]?f(liveData[s]):'—'}</div>
-        <div style="font-size:9px;color:var(--t3);cursor:pointer" onclick="removeSym('${s}',event)">✕</div>
-      </div>
-    </div>`;
+    const px=liveData[s]?f(liveData[s]):'—';
+    return '<div class="wr '+(s===curSym?'on':'')+'" data-s="'+s+'" onclick="loadSym(''+s+'')">'
+      +'<div><span class="wsym">'+(info?.l||s)+'</span><span class="wex">'+(info?.e||'BINANCE')+'</span>'
+      +(info?.n?'<div style="font-size:9px;color:var(--t3);margin-top:1px">'+info.n+'</div>':'')
+      +'</div>'
+      +'<div style="text-align:right">'
+      +'<div class="wpx" style="font-size:11px">'+px+'</div>'
+      +'<div style="font-size:9px;color:var(--t3);cursor:pointer" onclick="event.stopPropagation();removeSym(''+s+'')">✕</div>'
+      +'</div></div>';
   }).join('');
 }
 function renderIndList(){
@@ -1531,8 +1538,14 @@ window.onload=()=>{
   initChart();
   renderWl();renderIndList();renderAlList();updateCondDD();
   if(botUrl)testBot();
-  loadSym(curSym);
-  startWlStream();
+  // Small delay ensures chart DOM is fully rendered before loading data
+  setTimeout(()=>{
+    const el=document.getElementById('chart');
+    chart.applyOptions({width:el.clientWidth||window.innerWidth-210,height:Math.max(300,el.parentElement.clientHeight-40)});
+    resizeCv();
+    loadSym(curSym);
+    startWlStream();
+  },100);
   fetchRR(); // fetch RR config from AlgoBot for SL/TGT calc
   // Periodically re-render canvas
   setInterval(renderCv,500);

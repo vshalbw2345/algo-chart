@@ -400,8 +400,9 @@ body{background:var(--bg);color:var(--t);font-family:var(--fn);font-size:12px;he
     <input class="mi" id="iname" placeholder="e.g. My CPR Indicator" style="margin-bottom:6px"/>
     <label class="ml">Built-in Type</label>
     <select class="msel" id="itype" style="margin-bottom:6px">
+      <option value="ema_cross">EMA Crossover (9 × 15) — Buy/Sell Signals</option>
       <option value="sma">SMA — Simple Moving Average</option>
-      <option value="ema">EMA — Exponential Moving Average</option>
+      <option value="ema">EMA — Single EMA line</option>
       <option value="bb">Bollinger Bands (20, 2)</option>
       <option value="vwap">VWAP</option>
       <option value="pine">Custom — Pine Script (reference only)</option>
@@ -891,12 +892,36 @@ async function bnData(sym,tf){
   return d.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5]}));
 }
 async function yData(sym,tf){
-  const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${YH_IV[tf]||'5m'}&range=${YH_RG[tf]||'5d'}&includePrePost=false`);
-  const d=await r.json();
-  const res=d.chart?.result?.[0];if(!res)throw new Error('No data');
-  const ts=res.timestamps||res.timestamp||[];
-  const q=res.indicators?.quote?.[0]||{};
-  return ts.map((t,i)=>({time:t,open:q.open?.[i],high:q.high?.[i],low:q.low?.[i],close:q.close?.[i],volume:q.volume?.[i]||0})).filter(c=>c.open&&c.close&&!isNaN(c.close));
+  // Route through AlgoBot backend (server-side, no CORS)
+  if(botUrl){
+    try{
+      const r=await fetch(`${botUrl}/api/chart/history?symbol=${encodeURIComponent(sym)}&tf=${tf}`,{signal:AbortSignal.timeout(15000)});
+      const d=await r.json();
+      if(d.success&&d.candles?.length){return d.candles;}
+      console.warn('[CHART] Bot proxy returned no data, trying direct...');
+    }catch(e){console.warn('[CHART] Bot proxy failed:',e.message);}
+  }
+  // Direct fetch (works if not blocked by CORS — depends on browser/server)
+  try{
+    const proxies=[
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${YH_IV[tf]||'5m'}&range=${YH_RG[tf]||'5d'}&includePrePost=false`)}`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${YH_IV[tf]||'5m'}&range=${YH_RG[tf]||'5d'}&includePrePost=false`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${YH_IV[tf]||'5m'}&range=${YH_RG[tf]||'5d'}&includePrePost=false`,
+    ];
+    for(const url of proxies){
+      try{
+        const r=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10000)});
+        const text=await r.text();
+        const d=JSON.parse(text);
+        const res=d.chart?.result?.[0];if(!res)continue;
+        const ts=res.timestamps||res.timestamp||[];
+        const q=res.indicators?.quote?.[0]||{};
+        const candles=ts.map((t,i)=>({time:t,open:q.open?.[i],high:q.high?.[i],low:q.low?.[i],close:q.close?.[i],volume:q.volume?.[i]||0})).filter(c=>c.open&&c.close&&!isNaN(c.close));
+        if(candles.length>0)return candles;
+      }catch(e){continue;}
+    }
+  }catch(e){}
+  throw new Error(`No data for ${sym}. Please connect AlgoBot — Indian stock data is fetched via AlgoBot server.`);
 }
 
 // ══════════════════════════════ LIVE FEED ════════════════════════════════════
@@ -1013,12 +1038,24 @@ function saveInd(){
   closeIndM();renderIndData();
   showToast(`✅ "${name}" ${editIndId?'updated':'added'}`,'success');
 }
+// Fetch RR config from AlgoBot for SL/TGT calculation
+let rrCfg={riskPct:2,rrRatio:2,cryptoRiskPct:2,cryptoRRRatio:2};
+async function fetchRR(){
+  if(!botUrl)return;
+  try{
+    const r=await fetch(`${botUrl}/api/risk/config`,{signal:AbortSignal.timeout(5000)});
+    const d=await r.json();if(d.success&&d.config)rrCfg=d.config;
+  }catch(e){}
+}
+
 function renderIndData(){
   Object.entries(indSeries).forEach(([,s])=>{try{chart.removeSeries(s);}catch(e){}});
   indSeries={};if(!allCandles.length)return;
   indicators.filter(i=>i.visible&&i.type!=='pine').forEach(ind=>{
     try{
-      if(ind.type==='sma'||ind.type==='ema'){
+      if(ind.type==='ema_cross'){
+        renderEMACross(ind);return;
+      } else if(ind.type==='sma'||ind.type==='ema'){
         const s=chart.addLineSeries({color:ind.color,lineWidth:1,title:ind.name,lastValueVisible:true,priceLineVisible:false});
         s.setData(calcMA(allCandles,ind.period,ind.type).filter(v=>v.value!==null));indSeries[ind.id]=s;
       } else if(ind.type==='bb'){
@@ -1034,6 +1071,118 @@ function renderIndData(){
     }catch(e){}
   });
 }
+// ══════════════════ EMA CROSSOVER INDICATOR ════════════════════
+function renderEMACross(ind){
+  const fast=9,slow=15;
+  const emaF=calcMA(allCandles,fast,'ema');
+  const emaS=calcMA(allCandles,slow,'ema');
+
+  // Draw EMA lines
+  const sf=chart.addLineSeries({color:'#4c8eff',lineWidth:1,title:'EMA9',lastValueVisible:true,priceLineVisible:false});
+  const ss2=chart.addLineSeries({color:'#f59e0b',lineWidth:1,title:'EMA15',lastValueVisible:true,priceLineVisible:false});
+  sf.setData(emaF.filter(v=>v.value!==null));
+  ss2.setData(emaS.filter(v=>v.value!==null));
+  indSeries[ind.id+'_f']=sf;indSeries[ind.id+'_s']=ss2;
+
+  // Detect crossovers & crossunders
+  const signals=[];
+  for(let i=slow;i<allCandles.length;i++){
+    const fCur=emaF[i].value,sCur=emaS[i].value;
+    const fPrv=emaF[i-1].value,sPrv=emaS[i-1].value;
+    if(!fCur||!sCur||!fPrv||!sPrv)continue;
+    const entry=allCandles[i].close;
+    const rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
+    const rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
+    const slDist=entry*rp/100;
+
+    if(fPrv<=sPrv&&fCur>sCur){
+      // CROSSOVER — BUY
+      const sl=entry-slDist;
+      const tgt=entry+slDist*rr;
+      signals.push({time:allCandles[i].time,type:'buy',entry,sl,tgt,rp,rr});
+    } else if(fPrv>=sPrv&&fCur<sCur){
+      // CROSSUNDER — SELL
+      const sl=entry+slDist;
+      const tgt=entry-slDist*rr;
+      signals.push({time:allCandles[i].time,type:'sell',entry,sl,tgt,rp,rr});
+    }
+  }
+
+  // Draw signals as markers
+  const markers=signals.map(s=>({
+    time:s.time,
+    position:s.type==='buy'?'belowBar':'aboveBar',
+    color:s.type==='buy'?'#00d085':'#ff4560',
+    shape:s.type==='buy'?'arrowUp':'arrowDown',
+    text:s.type==='buy'?`BUY ${f(s.entry)}
+SL:${f(s.sl)}
+TGT:${f(s.tgt)}`:
+                       `SELL ${f(s.entry)}
+SL:${f(s.sl)}
+TGT:${f(s.tgt)}`
+  }));
+  if(markers.length)sf.setMarkers(markers);
+
+  // Auto-create alerts for last signal
+  const last=signals[signals.length-1];
+  if(last&&allCandles[allCandles.length-1]){
+    const latestBar=allCandles[allCandles.length-1].time;
+    if(Math.abs(latestBar-last.time)<3600){ // within last hour
+      showToast(`📊 EMA Cross: ${last.type.toUpperCase()} signal @ ${f(last.entry)} | SL:${f(last.sl)} TGT:${f(last.tgt)}`,'info');
+    }
+  }
+
+  // Store signals for alert creation
+  window._emaCrossSignals=signals;
+  window._emaCrossInd=ind;
+
+  // Render SL/TGT lines for last signal on chart
+  if(last){
+    try{
+      const ec=AL_C[last.type==='buy'?'buy':'sell'];
+      cs.createPriceLine({price:last.entry,color:'#ffffff',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,title:`${last.type.toUpperCase()} Entry`});
+      cs.createPriceLine({price:last.sl,color:'#ff4560',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:`SL (${last.rp}%)`});
+      cs.createPriceLine({price:last.tgt,color:'#00d085',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,title:`TGT (1:${last.rr})`});
+    }catch(e){}
+  }
+}
+
+// Create all 6 alerts for an EMA signal (Buy, Sell, Buy SL, Buy TGT, Sell SL, Sell TGT)
+function createEMACrossAlerts(){
+  const sigs=window._emaCrossSignals;
+  const ind=window._emaCrossInd;
+  if(!sigs?.length||!ind){showToast('No EMA signals on chart','warn');return;}
+  const last=sigs[sigs.length-1];
+  const tf=curTF;
+  const isBuy=last.type==='buy';
+
+  const toCreate=[
+    {type:isBuy?'buy':'sell',     price:last.entry, note:`${ind.name} ${isBuy?'BUY':'SELL'} Entry @ ${f(last.entry)}`},
+    {type:isBuy?'buy_sl':'sell_sl', price:last.sl,  note:`${ind.name} ${isBuy?'Buy':'Sell'} SL @ ${f(last.sl)} (${last.rp}%)`},
+    {type:isBuy?'buy_tgt':'sell_tgt',price:last.tgt,note:`${ind.name} ${isBuy?'Buy':'Sell'} TGT @ ${f(last.tgt)} (1:${last.rr})`},
+  ];
+
+  let added=0;
+  toCreate.forEach(at=>{
+    const exists=alerts.find(a=>a.sym===curSym&&a.type===at.type&&Math.abs(a.price-at.price)<0.01);
+    if(!exists){
+      const a={
+        id:Date.now()+added++,sym:curSym,tf,price:at.price,
+        type:at.type,side:at.type.startsWith('buy')?'BUY':'SELL',
+        qty:1,ordType:'MARKET',condition:at.type.includes('sl')||at.type.includes('tgt')?'cross':'above',
+        trigger:'once',broker:'auto',note:at.note,
+        sendBot:!!botUrl,logSheet:!!sheetUrl,enabled:true,fired:false,
+        createdAt:new Date().toISOString(),
+        // Pass SL/TGT/RR data back to AlgoBot
+        meta:{sl:last.sl,tgt:last.tgt,riskPct:last.rp,rrRatio:last.rr,entry:last.entry,indicator:ind.name}
+      };
+      alerts.push(a);
+    }
+  });
+  ss('av_al',alerts);renderAlList();renderCv();
+  showToast(`✅ ${toCreate.length} EMA cross alerts created for ${curSym}`,'success');
+}
+
 function calcMA(c,p,t){
   const r=[];let ema=null;
   for(let i=0;i<c.length;i++){
@@ -1196,6 +1345,10 @@ async function sendToBot(alert,price){
       body:JSON.stringify({symbol:alert.sym,side,price:price||alert.price,type:alert.type,
         tf:alert.tf||curTF,qty:alert.qty||1,orderType:alert.ordType||'MARKET',
         broker:alert.broker||'auto',note:alert.note||'',source:'chart',
+        // Pass SL/TGT/RR metadata if set (from indicator signals)
+        sl:alert.meta?.sl,tgt:alert.meta?.tgt,
+        riskPct:alert.meta?.riskPct,rrRatio:alert.meta?.rrRatio,
+        entry:alert.meta?.entry,indicator:alert.meta?.indicator,
         timestamp:new Date().toISOString()}),
       signal:AbortSignal.timeout(10000)});
     const d=await r.json();
@@ -1303,6 +1456,7 @@ function renderIndList(){
     </div>
     <div style="font-size:9px;color:var(--t3)">${i.type.toUpperCase()}${i.type!=='pine'&&i.period?` (${i.period})`:''}</div>
     ${i.script?`<div style="font-size:9px;color:var(--t3);overflow:hidden;max-height:24px;margin-top:2px">${i.script.slice(0,60)}…</div>`:''}
+    ${i.type==='ema_cross'?`<button class="xb" style="width:100%;margin-top:4px;background:var(--B)20;color:var(--B);border-color:var(--B)40" onclick="createEMACrossAlerts()">🔔 Create All EMA Alerts</button>`:''}
   </div>`).join('');
 }
 function renderAlList(){
@@ -1361,7 +1515,8 @@ window.onload=()=>{
   if(botUrl)testBot();
   loadSym(curSym);
   startWlStream();
-  // Periodically re-render canvas (for price changes affecting line positions)
+  fetchRR(); // fetch RR config from AlgoBot for SL/TGT calc
+  // Periodically re-render canvas
   setInterval(renderCv,500);
 };
 </script>

@@ -314,9 +314,12 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
         🤖 When price hits → AlgoBot places order on selected broker automatically
       </div>
 
-      <div class="abtns">
+      <div class="abtns" style="flex-wrap:wrap;gap:6px">
         <button class="acancel" onclick="closeAP()">Cancel</button>
-        <button class="aok" id="apOk" onclick="confirmAl()" style="background:#00d085">Create Alert</button>
+        <button class="aok" id="apOk" onclick="confirmAl()" style="background:#00d085;flex:1;min-width:120px">Create Alert</button>
+        <button class="aok" onclick="createAll6()" style="background:#a78bfa;width:100%;margin-top:4px">
+          ⚡ Create All 6 Alerts (Buy + Buy SL + Buy TGT + Sell + Sell SL + Sell TGT)
+        </button>
       </div>
     </div>
 
@@ -965,6 +968,53 @@ function openAP(px){
   document.getElementById('alpanel').classList.add('open');
 }
 function closeAP(){document.getElementById('alpanel').classList.remove('open');pendingPx=null;}
+function createAll6(){
+  var price=parseFloat(document.getElementById('apPx').value)||pendingPx;
+  var condSrc=document.getElementById('apCond').value;
+  if(!price&&allCandles.length)price=allCandles[allCandles.length-1].close;
+  if(!price){toast('Enter a price first','warn');return;}
+
+  var brkv=document.getElementById('apBrk').value;
+  var tfv=document.getElementById('apTF').value;
+  var tf=tfv==='same'?curTF:tfv;
+  var qty=parseInt(document.getElementById('apQty').value)||1;
+  var ordType=document.getElementById('apOT').value;
+  var baseName=document.getElementById('apNote').value||curSym;
+
+  // Get RR values for SL/TGT calculation
+  var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
+  var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
+  var slDist=price*rp/100;
+  var buySL=parseFloat((price-slDist).toFixed(4));
+  var buyTGT=parseFloat((price+slDist*rr).toFixed(4));
+  var sellSL=parseFloat((price+slDist).toFixed(4));
+  var sellTGT=parseFloat((price-slDist*rr).toFixed(4));
+
+  var toCreate=[
+    {type:'buy',     side:'BUY',  price:price,  condition:'above', note:baseName+' — BUY @ '+f(price)},
+    {type:'buy_sl',  side:'SELL', price:buySL,  condition:'below', note:baseName+' — Buy SL @ '+f(buySL)+' ('+rp+'%)'},
+    {type:'buy_tgt', side:'SELL', price:buyTGT, condition:'above', note:baseName+' — Buy TGT @ '+f(buyTGT)+' (1:'+rr+')'},
+    {type:'sell',    side:'SELL', price:price,  condition:'below', note:baseName+' — SELL @ '+f(price)},
+    {type:'sell_sl', side:'BUY',  price:sellSL, condition:'above', note:baseName+' — Sell SL @ '+f(sellSL)+' ('+rp+'%)'},
+    {type:'sell_tgt',side:'BUY',  price:sellTGT,condition:'below', note:baseName+' — Sell TGT @ '+f(sellTGT)+' (1:'+rr+')'},
+  ];
+
+  var now=new Date().toISOString();
+  toCreate.forEach(function(at,k){
+    als.push({
+      id:Date.now()+k,sym:curSym,tf:tf,price:at.price,
+      type:at.type,side:at.side,qty:qty,ordType:ordType,
+      condition:at.condition,trigger:'once',broker:brkv,
+      note:at.note,logSheet:!!sheetUrl,
+      sendBot:brkv!=='none',enabled:true,fired:false,
+      createdAt:now,
+      meta:{sl:buySL,tgt:buyTGT,riskPct:rp,rrRatio:rr,entry:price}
+    });
+  });
+  ss('av_al',als);renderAlList();renderCv();closeAP();
+  toast('✅ 6 alerts created for '+curSym+' @ '+f(price)+' | SL:'+rp+'% | RR:1:'+rr,'success');
+}
+
 function confirmAl(){
   var condSrc=document.getElementById('apCond').value;
   var isInd=condSrc.indexOf('ind_')===0;
@@ -986,6 +1036,9 @@ function checkAlerts(candles){
     var px=last.close,op=a.condition||'above';
     var trig=op==='above'?px>=a.price:op==='below'?px<=a.price:(px>=a.price||px<=a.price);
     if(!trig)return;
+    // Grace period: don't fire within 15 seconds of creation
+    var age=(Date.now()-new Date(a.createdAt).getTime())/1000;
+    if(age<15)return;
     if(a.trigger!=='every'&&a.trigger!=='minute')a.fired=true;
     a.firedAt=new Date().toISOString();
     frd.unshift(Object.assign({},a,{firedPrice:px}));frd=frd.slice(0,50);

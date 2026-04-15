@@ -918,7 +918,17 @@ function createEMAAlerts(){
     {type:isBuy?'buy_tgt':'sell_tgt',price:last.tgt,note:ind.name+' '+(isBuy?'Buy':'Sell')+' TGT @ '+f(last.tgt)},
   ];
   toAdd.forEach(function(at,k){
-    als.push({id:Date.now()+k,sym:curSym,tf:curTF,price:at.price,type:at.type,side:at.type.startsWith('buy')?'BUY':'SELL',qty:1,ordType:'MARKET',condition:at.type.includes('sl')||at.type.includes('tgt')?'cross':'above',trigger:'once',broker:'auto',note:at.note,sendBot:!!botUrl,logSheet:!!sheetUrl,enabled:true,fired:false,createdAt:new Date().toISOString(),meta:{sl:last.sl,tgt:last.tgt,riskPct:last.rp,rrRatio:last.rr,entry:last.entry}});
+    als.push({id:Date.now()+k,sym:curSym,tf:curTF,price:at.price,
+      type:at.type,side:at.type.indexOf('buy')===0?'BUY':'SELL',
+      qty:1,ordType:'MARKET',
+      condition:at.type.indexOf('sl')>-1||at.type.indexOf('tgt')>-1?'cross':'above',
+      trigger:'every',
+      broker:'auto',note:at.note,sendBot:!!botUrl,logSheet:!!sheetUrl,enabled:true,
+      condSrc:ind?'ind_'+ind.id:'ind_ema',
+      createdAt:new Date().toISOString(),
+      meta:{sl:last.sl,tgt:last.tgt,riskPct:last.rp,rrRatio:last.rr,entry:last.entry}
+    });
+  });
   });
   ss('av_al',als);renderAlList();renderCv();
   toast('✅ 3 EMA alerts created','success');
@@ -1006,15 +1016,20 @@ function createAll6(){
 
   var now=new Date().toISOString();
   toCreate.forEach(function(at,k){
+    var cs2=document.getElementById('apCond').value;
+    var isInd2=cs2&&cs2.indexOf('ind_')===0;
     als.push({
       id:Date.now()+k,sym:curSym,tf:tf,price:at.price,
       type:at.type,side:at.side,qty:qty,ordType:ordType,
-      condition:at.condition,trigger:'once',broker:brkv,
-      note:at.note,logSheet:!!sheetUrl,
-      sendBot:brkv!=='none',enabled:true,fired:false,
-      createdAt:now,
+      condition:at.condition,
+      trigger:isInd2?'every':'once',
+      broker:brkv,note:at.note,logSheet:!!sheetUrl,
+      sendBot:brkv!=='none',enabled:true,
+      condSrc:isInd2?cs2:'price',
+      createdAt:new Date().toISOString(),
       meta:{sl:buySL,tgt:buyTGT,riskPct:rp,rrRatio:rr,entry:price}
     });
+  });
   });
   ss('av_al',als);renderAlList();renderCv();closeAP();
   toast('✅ 6 alerts created for '+curSym+' @ '+f(price)+' | SL:'+rp+'% | RR:1:'+rr,'success');
@@ -1058,13 +1073,13 @@ function confirmAl(){
     qty:parseInt(document.getElementById('apQty').value)||1,
     ordType:document.getElementById('apOT').value,
     condition:cond,
-    condSrc:condSrc,
+    condSrc:condSrc||'price',  // always set — 'price' or 'ind_XXXX'
     trigger:document.getElementById('apTr').value,
     broker:brkv,
     note:document.getElementById('apNote').value||(side+' '+curSym+' @ '+f(price)),
     logSheet:document.getElementById('apSh').checked,
     sendBot:brkv!=='none',
-    enabled:true,fired:false,
+    enabled:true,
     createdAt:new Date().toISOString()
   };
   als.push(a);ss('av_al',als);renderAlList();renderCv();closeAP();
@@ -1092,11 +1107,13 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
     return a.enabled&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
   }).forEach(function(a){
     var match=false;
-    if(a.type===signalType)match=true;                          // exact: buy matches buy signal
-    if(a.type==='buy_sl'&&signalType==='sell')match=true;       // buy SL exits on sell signal
-    if(a.type==='buy_tgt'&&signalType==='sell')match=true;      // buy TGT also on sell
-    if(a.type==='sell_sl'&&signalType==='buy')match=true;       // sell SL exits on buy signal
-    if(a.type==='sell_tgt'&&signalType==='buy')match=true;      // sell TGT on buy
+    // BUY crossover signal fires: buy entry, buy_sl exit (stop hit), buy_tgt exit (target hit)
+    if(signalType==='buy'&&(a.type==='buy'))match=true;
+    // SELL crossunder signal fires: sell entry, sell_sl exit, sell_tgt exit
+    if(signalType==='sell'&&(a.type==='sell'))match=true;
+    // Cross exit alerts: when opposite signal fires, exit the trade
+    if(signalType==='sell'&&(a.type==='buy_sl'||a.type==='buy_tgt'))match=true;
+    if(signalType==='buy'&&(a.type==='sell_sl'||a.type==='sell_tgt'))match=true;
     if(!match)return;
     // Don't fire on first bar after creation (grace)
     var age=(Date.now()-new Date(a.createdAt).getTime())/1000;

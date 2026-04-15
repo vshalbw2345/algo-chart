@@ -666,7 +666,7 @@ function renderCv(preview){
   for(var i=0;i<drws.length;i++)drawOne(drws[i]);
   // Alert lines
   for(var i=0;i<als.length;i++){
-    var a=als[i];if(a.sym!==curSym||a.fired)continue;
+    var a=als[i];if(a.sym!==curSym||!a.enabled)continue;
     var ay=cs.priceToCoordinate(a.price);if(ay==null)continue;
     ctx.save();var ac=ALC[a.type]||'#f59e0b';
     ctx.strokeStyle=ac;ctx.lineWidth=1;ctx.setLineDash([3,3]);
@@ -1083,13 +1083,13 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
   // Store latest signal
   if(!lastEmaSignal[sym])lastEmaSignal[sym]={};
   var prev=lastEmaSignal[sym];
-  // Only process if this is a NEW candle signal (not same candle repeated)
-  if(prev.time===candleTime)return;
+  // Only process if this is a NEW candle signal (different bar)
+  if(prev.time===candleTime&&prev.type===signalType)return;
   lastEmaSignal[sym]={type:signalType,time:candleTime,price:price};
 
   // Find all enabled alerts for this symbol linked to indicator
   als.filter(function(a){
-    return a.enabled&&!a.fired&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
+    return a.enabled&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
   }).forEach(function(a){
     var match=false;
     if(a.type===signalType)match=true;                          // exact: buy matches buy signal
@@ -1103,8 +1103,8 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
     if(age<30)return;
     // Fire alert
     a.lastFiredTime=candleTime;
-    // Only set fired=true for trigger='once', keep enabled for others
-    if(a.trigger==='once')a.fired=true;
+    // NEVER auto-disable — alert stays enabled, user disables manually
+    // Just record when it last fired
     a.firedAt=new Date().toISOString();
     frd.unshift(Object.assign({},a,{firedPrice:price}));frd=frd.slice(0,50);
     ss('av_fired',frd);
@@ -1122,7 +1122,7 @@ function checkAlerts(candles){
   var changed=false;
   als.filter(function(a){
     // Only check price-based alerts here, indicator alerts handled in onIndicatorSignal
-    return a.enabled&&!a.fired&&a.sym===curSym&&(!a.condSrc||a.condSrc==='price');
+    return a.enabled&&a.sym===curSym&&(!a.condSrc||a.condSrc==='price');
   }).forEach(function(a){
     var px=last.close,op=a.condition||'above';
     var prev2=allCandles.length>=2?allCandles[allCandles.length-2].close:px;
@@ -1135,7 +1135,7 @@ function checkAlerts(candles){
     // Grace period
     var age=(Date.now()-new Date(a.createdAt).getTime())/1000;
     if(age<15)return;
-    if(a.trigger==='once')a.fired=true;
+    // NEVER auto-disable — stays enabled, user disables manually
     a.firedAt=new Date().toISOString();
     frd.unshift(Object.assign({},a,{firedPrice:px}));frd=frd.slice(0,50);
     ss('av_fired',frd);changed=true;
@@ -1239,12 +1239,12 @@ function renderAlList(){
   no.style.display=sa.length?'none':'block';
   el.innerHTML=sa.map(function(a){
     var c=ALC[a.type]||'#f59e0b';
-    var isFired=a.fired&&a.trigger==='once';
-    return '<div class="ar '+(a.type.indexOf('buy')===0?'b':'s')+(isFired?' f':'')+'">'
+    var hasFired=!!a.firedAt;
+    return '<div class="ar '+(a.type.indexOf('buy')===0?'b':'s')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:11px;font-weight:700;color:'+c+';overflow:hidden;max-width:120px;text-overflow:ellipsis;white-space:nowrap" title="'+(a.note||'')+'">'+(a.note||a.type.toUpperCase()+' @ '+f(a.price))+'</span>'
       +'<div style="display:flex;gap:3px;align-items:center;flex-shrink:0"><button class="tog'+(a.enabled&&!a.fired?' on':'')+'" onclick="toggleAl('+a.id+')"></button><button class="xb del" onclick="deleteAl('+a.id+')">✕</button></div>'
-      +'</div><div style="font-size:9px;color:#8892aa;margin-top:2px">'+f(a.price)+' x'+(a.qty||1)+' · '+(a.tf||curTF).toUpperCase()+' '+(a.sendBot?'🤖':'')+' '+(a.fired?'✅ FIRED':'')+'</div>'
+      +'</div><div style="font-size:9px;color:#8892aa;margin-top:2px">'+f(a.price)+' x'+(a.qty||1)+' · '+(a.tf||curTF).toUpperCase()+' '+(a.sendBot?'🤖':'')+' '+(a.firedAt?'✅ Fired':'')+'</div>'
       +'</div>';
   }).join('');
 }

@@ -92,8 +92,8 @@ body{background:var(--bg);color:var(--t);font-family:var(--fn);font-size:12px;he
 .tog.on::after{left:13px}
 
 /* CHART */
-.cw{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden}
-#chart{flex:1;min-height:0}
+.cw{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#chart{flex:1;min-height:0;width:100%}
 #cv{position:absolute;top:0;left:0;pointer-events:none;z-index:2}
 #ov{position:absolute;top:0;left:0;z-index:3;display:none;cursor:crosshair}
 .cxi{position:absolute;top:7px;left:7px;background:var(--bg2)ee;border:1px solid var(--bd);border-radius:5px;padding:4px 8px;font-size:11px;pointer-events:none;z-index:10;display:none}
@@ -595,18 +595,18 @@ function initChart(){
     if(p.point)lastCY=p.point.y;
   });
   chart.timeScale().subscribeVisibleTimeRangeChange(()=>renderCv());
-  new ResizeObserver(()=>{
-    const h=el.parentElement.clientHeight-40;
-    chart.applyOptions({width:el.clientWidth,height:Math.max(200,h)});
-    resizeCv();
+  new ResizeObserver(entries=>{
+    for(const e of entries){
+      const w=e.contentRect.width;
+      const h=e.contentRect.height-40;
+      if(w>10&&h>100){
+        chart.applyOptions({width:w,height:Math.max(200,h)});
+        resizeCv();
+      }
+    }
   }).observe(el.parentElement);
   initCv();
   if(isLight)applyTheme();
-  // Force initial size
-  const cel=document.getElementById('chart');
-  const h=Math.max(300,cel.parentElement.clientHeight-40);
-  chart.applyOptions({width:cel.clientWidth||window.innerWidth-210,height:h});
-  resizeCv();
 }
 const f=n=>n==null?'—':n>=10000?n.toFixed(2):n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);
 
@@ -1538,14 +1538,22 @@ window.onload=()=>{
   initChart();
   renderWl();renderIndList();renderAlList();updateCondDD();
   if(botUrl)testBot();
-  // Small delay ensures chart DOM is fully rendered before loading data
-  setTimeout(()=>{
+  // Force chart dimensions after layout settles
+  function doLoad(){
     const el=document.getElementById('chart');
-    chart.applyOptions({width:el.clientWidth||window.innerWidth-210,height:Math.max(300,el.parentElement.clientHeight-40)});
+    const cw=document.getElementById('cw');
+    const w=el.offsetWidth||cw.offsetWidth||window.innerWidth-210;
+    const h=Math.max(300,(cw.offsetHeight||window.innerHeight-80)-40);
+    console.log('[CHART] Init size: '+w+'x'+h);
+    chart.applyOptions({width:w,height:h});
     resizeCv();
     loadSym(curSym);
     startWlStream();
-  },100);
+    fetchRR();
+  }
+  // Try immediately, then retry to handle slow layout
+  setTimeout(doLoad,50);
+  setTimeout(doLoad,300);
   fetchRR(); // fetch RR config from AlgoBot for SL/TGT calc
   // Periodically re-render canvas
   setInterval(renderCv,500);

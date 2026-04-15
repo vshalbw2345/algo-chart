@@ -1218,8 +1218,18 @@ function updateCondDD(){
 }
 function onCondChange(){
   const v=document.getElementById('apCond').value;
-  document.getElementById('apIndTypeSec').style.display=v.startsWith('ind_')?'block':'none';
-  document.getElementById('apPriceSec').style.display=v.startsWith('ind_')?'none':'block';
+  const isInd=v.startsWith('ind_');
+  document.getElementById('apIndTypeSec').style.display=isInd?'block':'none';
+  document.getElementById('apPriceSec').style.display=isInd?'none':'block';
+  // When indicator selected: auto-fill current price and show info
+  if(isInd&&allCandles.length){
+    const last=allCandles[allCandles.length-1];
+    document.getElementById('apPrice').value=last?.close?f(last.close):'';
+    // Update operation hint
+    const opSel=document.getElementById('apOp');
+    if(alSide==='buy')opSel.value='above';
+    else opSel.value='below';
+  }
 }
 
 async function fetchBrokers(){
@@ -1285,7 +1295,15 @@ function openAlPanel(price){
 function closeAlPanel(){document.getElementById('alpanel').classList.remove('open');pendingPrice=null;}
 
 function confirmAl(){
-  const price=parseFloat(document.getElementById('apPrice').value)||pendingPrice;
+  const condSrc=document.getElementById('apCond').value;
+  const isInd=condSrc.startsWith('ind_');
+  // If indicator selected → use current market price (last close)
+  // If price based → use entered price
+  let price=parseFloat(document.getElementById('apPrice').value)||pendingPrice;
+  if(!price&&isInd){
+    // Use last candle close as reference price
+    price=allCandles.length?allCandles[allCandles.length-1]?.close:0;
+  }
   if(!price){showToast('Enter a price','warn');return;}
   const tfV=document.getElementById('apTF').value;
   const condSrc=document.getElementById('apCond').value;

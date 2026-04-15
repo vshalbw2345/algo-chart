@@ -891,7 +891,20 @@ function renderEMACross(ind){
   }
   if(markers.length)sf.setMarkers(markers);
   window._emaSigs=sigs;window._emaInd=ind;
-  if(sigs.length){var last2=sigs[sigs.length-1];try{cs.createPriceLine({price:last2.entry,color:'#fff',lineWidth:1,lineStyle:1,title:last2.type.toUpperCase()+' Entry'});cs.createPriceLine({price:last2.sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+last2.rp+'%)'});cs.createPriceLine({price:last2.tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+last2.rr+')'});}catch(e){}}
+  if(sigs.length){
+    var last2=sigs[sigs.length-1];
+    try{
+      cs.createPriceLine({price:last2.entry,color:'#fff',lineWidth:1,lineStyle:1,title:last2.type.toUpperCase()+' Entry'});
+      cs.createPriceLine({price:last2.sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+last2.rp+'%)'});
+      cs.createPriceLine({price:last2.tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+last2.rr+')'});
+    }catch(e){}
+    // Check if last signal is on the latest candle — trigger alert if so
+    var latestCandle=allCandles[allCandles.length-1];
+    if(latestCandle&&last2.time===latestCandle.time){
+      // NEW signal on latest candle — notify indicator alert system
+      onIndicatorSignal(curSym,last2.type,last2.entry,last2.time);
+    }
+  }
 }
 function createEMAAlerts(){
   var sigs=window._emaSigs,ind=window._emaInd;
@@ -1057,22 +1070,67 @@ function confirmAl(){
 }
 function toggleAl(id){var a=als.find(function(x){return x.id===id;});if(a){a.enabled=!a.enabled;ss('av_al',als);renderAlList();}}
 function deleteAl(id){als=als.filter(function(a){return a.id!==id;});ss('av_al',als);renderAlList();renderCv();}
+// Track last EMA signal per symbol to detect NEW crossovers only
+var lastEmaSignal={};  // {symbol: {type:'buy'|'sell', time:timestamp}}
+
+// Called by renderEMACross when new signal detected on latest candle
+function onIndicatorSignal(sym,signalType,price,candleTime){
+  // Store latest signal
+  if(!lastEmaSignal[sym])lastEmaSignal[sym]={};
+  var prev=lastEmaSignal[sym];
+  // Only process if this is a NEW candle signal (not same candle repeated)
+  if(prev.time===candleTime)return;
+  lastEmaSignal[sym]={type:signalType,time:candleTime,price:price};
+
+  // Find all enabled alerts for this symbol linked to indicator
+  als.filter(function(a){
+    return a.enabled&&!a.fired&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
+  }).forEach(function(a){
+    var match=false;
+    if(a.type===signalType)match=true;                          // exact: buy matches buy signal
+    if(a.type==='buy_sl'&&signalType==='sell')match=true;       // buy SL exits on sell signal
+    if(a.type==='buy_tgt'&&signalType==='sell')match=true;      // buy TGT also on sell
+    if(a.type==='sell_sl'&&signalType==='buy')match=true;       // sell SL exits on buy signal
+    if(a.type==='sell_tgt'&&signalType==='buy')match=true;      // sell TGT on buy
+    if(!match)return;
+    // Don't fire on first bar after creation (grace)
+    var age=(Date.now()-new Date(a.createdAt).getTime())/1000;
+    if(age<30)return;
+    // Fire alert
+    a.lastFiredTime=candleTime;
+    // Only set fired=true for trigger='once', keep enabled for others
+    if(a.trigger==='once')a.fired=true;
+    a.firedAt=new Date().toISOString();
+    frd.unshift(Object.assign({},a,{firedPrice:price}));frd=frd.slice(0,50);
+    ss('av_fired',frd);
+    toast('🔔 '+a.note+' | '+signalType.toUpperCase()+' signal @ '+f(price),'info');
+    if(a.sendBot&&botUrl)sendToBot(a,price);
+    if(a.logSheet&&sheetUrl)logToSheet(a,price);
+  });
+  ss('av_al',als);renderAlList();renderCv();
+}
+
+// Price-level crossover check (for non-indicator alerts)
 function checkAlerts(candles){
-  if(!candles||!candles.length)return;var last=candles[candles.length-1];if(!last||!last.close)return;
+  if(!candles||!candles.length)return;
+  var last=candles[candles.length-1];if(!last||!last.close)return;
   var changed=false;
-  als.filter(function(a){return a.enabled&&!a.fired&&a.sym===curSym;}).forEach(function(a){
+  als.filter(function(a){
+    // Only check price-based alerts here, indicator alerts handled in onIndicatorSignal
+    return a.enabled&&!a.fired&&a.sym===curSym&&(!a.condSrc||a.condSrc==='price');
+  }).forEach(function(a){
     var px=last.close,op=a.condition||'above';
     var prev2=allCandles.length>=2?allCandles[allCandles.length-2].close:px;
-    // Use crossover logic — price must cross the level, not just be on one side
+    // True crossover: price must CROSS the level (not just sit above/below)
     var trig=false;
-    if(op==='above')trig=(prev2<a.price&&px>=a.price);        // crossed above
-    else if(op==='below')trig=(prev2>a.price&&px<=a.price);   // crossed below
+    if(op==='above')trig=(prev2<a.price&&px>=a.price);
+    else if(op==='below')trig=(prev2>a.price&&px<=a.price);
     else if(op==='cross')trig=(prev2<a.price&&px>=a.price)||(prev2>a.price&&px<=a.price);
     if(!trig)return;
-    // Grace period: don't fire within 15 seconds of creation
+    // Grace period
     var age=(Date.now()-new Date(a.createdAt).getTime())/1000;
     if(age<15)return;
-    if(a.trigger!=='every'&&a.trigger!=='minute')a.fired=true;
+    if(a.trigger==='once')a.fired=true;
     a.firedAt=new Date().toISOString();
     frd.unshift(Object.assign({},a,{firedPrice:px}));frd=frd.slice(0,50);
     ss('av_fired',frd);changed=true;
@@ -1176,7 +1234,8 @@ function renderAlList(){
   no.style.display=sa.length?'none':'block';
   el.innerHTML=sa.map(function(a){
     var c=ALC[a.type]||'#f59e0b';
-    return '<div class="ar '+(a.type.indexOf('buy')===0?'b':'s')+(a.fired?' f':'')+'">'
+    var isFired=a.fired&&a.trigger==='once';
+    return '<div class="ar '+(a.type.indexOf('buy')===0?'b':'s')+(isFired?' f':'')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:11px;font-weight:700;color:'+c+';overflow:hidden;max-width:120px;text-overflow:ellipsis;white-space:nowrap" title="'+(a.note||'')+'">'+(a.note||a.type.toUpperCase()+' @ '+f(a.price))+'</span>'
       +'<div style="display:flex;gap:3px;align-items:center;flex-shrink:0"><button class="tog'+(a.enabled&&!a.fired?' on':'')+'" onclick="toggleAl('+a.id+')"></button><button class="xb del" onclick="deleteAl('+a.id+')">✕</button></div>'

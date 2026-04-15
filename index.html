@@ -811,6 +811,7 @@ function startLive(sym,tf){
 function stopLive(){if(tickInt){clearInterval(tickInt);tickInt=null;}if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}}
 function tickUp(c){
   if(!allCandles.length||!cs)return;
+  isLiveUpdate=true;
   var last=allCandles[allCandles.length-1];
   if(c.time>last.time){allCandles.push(c);if(allCandles.length>2000)allCandles.shift();}
   else allCandles[allCandles.length-1]=Object.assign({},last,c);
@@ -818,6 +819,7 @@ function tickUp(c){
   vs.update({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'});
   updatePBar(c,allCandles[allCandles.length-2]||c);
   checkAlerts([c]);renderCv();
+  isLiveUpdate=false;
 }
 function setDot(col){var d=document.getElementById('ldot'),m={green:'#00d085',red:'#ff4560',orange:'#f59e0b'};if(d){d.style.background=m[col];d.style.boxShadow='0 0 5px '+m[col];}}
 
@@ -1072,9 +1074,12 @@ function toggleAl(id){var a=als.find(function(x){return x.id===id;});if(a){a.ena
 function deleteAl(id){als=als.filter(function(a){return a.id!==id;});ss('av_al',als);renderAlList();renderCv();}
 // Track last EMA signal per symbol to detect NEW crossovers only
 var lastEmaSignal={};  // {symbol: {type:'buy'|'sell', time:timestamp}}
+var isLiveUpdate=false; // true ONLY during live tick, not historical load
 
 // Called by renderEMACross when new signal detected on latest candle
 function onIndicatorSignal(sym,signalType,price,candleTime){
+  // ONLY fire on live tick updates, never on historical load
+  if(!isLiveUpdate)return;
   // Store latest signal
   if(!lastEmaSignal[sym])lastEmaSignal[sym]={};
   var prev=lastEmaSignal[sym];

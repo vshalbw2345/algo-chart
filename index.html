@@ -214,24 +214,17 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
         <button class="aclose" onclick="closeAP()">✕</button>
       </div>
 
-      <div class="ag" style="margin-bottom:10px">
-        <button class="sdb" id="apBuy" onclick="setAS('buy')"
-          style="border-color:#00d085;background:#00d085;color:#fff">▲ BUY</button>
-        <button class="sdb" id="apSell" onclick="setAS('sell')"
-          style="border-color:#ff456030;background:transparent;color:#ff4560">▼ SELL</button>
-      </div>
-
       <div class="dv"></div>
-
       <label class="ml">Condition</label>
       <select class="ms" id="apCond" onchange="onCC()" style="margin-bottom:6px">
         <option value="price">Price</option>
       </select>
       <div id="apIS" style="display:none;margin-bottom:6px">
         <label class="ml">Signal Type</label>
-        <select class="ms" id="apIT">
-          <option value="buy">Buy</option>
-          <option value="sell">Sell</option>
+        <select class="ms" id="apIT" onchange="onSigTypeChange()">
+          <option value="all">⚡ All 6 Alerts (Buy + SL + TGT + Sell + Sell SL + Sell TGT)</option>
+          <option value="buy">Buy Entry</option>
+          <option value="sell">Sell Entry</option>
           <option value="buy_sl">Buy Stoploss</option>
           <option value="buy_tgt">Buy Profit Target</option>
           <option value="sell_sl">Sell Stoploss</option>
@@ -242,10 +235,11 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
         <div class="ag">
           <div>
             <label class="ml">Crosses</label>
-            <select class="ms" id="apOp">
-              <option value="above">Above</option>
-              <option value="below">Below</option>
-              <option value="cross">Either direction</option>
+            <select class="ms" id="apOp" onchange="onSigTypeChange()">
+              <option value="all">⚡ All 6 Alerts at this price</option>
+              <option value="above">Above (Buy)</option>
+              <option value="below">Below (Sell)</option>
+              <option value="cross">Cross (Either)</option>
             </select>
           </div>
           <div>
@@ -317,9 +311,10 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
       <div class="abtns" style="flex-wrap:wrap;gap:6px">
         <button class="acancel" onclick="closeAP()">Cancel</button>
         <button class="aok" id="apOk" onclick="confirmAl()" style="background:#00d085;flex:1;min-width:120px">Create Alert</button>
-        <button class="aok" onclick="createAll6()" style="background:#a78bfa;width:100%;margin-top:4px">
-          ⚡ Create All 6 Alerts (Buy + Buy SL + Buy TGT + Sell + Sell SL + Sell TGT)
-        </button>
+        <div id="allInfo" style="display:none;width:100%;margin-top:4px;padding:5px 8px;border-radius:5px;background:#a78bfa15;border:1px solid #a78bfa30;font-size:10px;color:#a78bfa">
+          ⚡ Will create 6 alerts: BUY, Buy SL, Buy TGT, SELL, Sell SL, Sell TGT based on R&R config from AlgoBot
+        </div>
+
       </div>
     </div>
 
@@ -933,12 +928,7 @@ function onCC(){
   document.getElementById('apPS').style.display=isInd?'none':'block';
   if(isInd&&allCandles.length){document.getElementById('apPx').value=f(allCandles[allCandles.length-1].close);}
 }
-function setAS(side){
-  alSide=side;
-  var buy=document.getElementById('apBuy'),sell=document.getElementById('apSell'),ok=document.getElementById('apOk');
-  if(side==='buy'){buy.style.cssText='border-color:#00d085;background:#00d085;color:#fff';sell.style.cssText='border-color:#ff456030;background:transparent;color:#ff4560';ok.style.background='#00d085';document.getElementById('apOp').value='above';}
-  else{sell.style.cssText='border-color:#ff4560;background:#ff4560;color:#fff';buy.style.cssText='border-color:#00d08530;background:transparent;color:#00d085';ok.style.background='#ff4560';document.getElementById('apOp').value='below';}
-}
+function setAS(side){alSide=side;} // kept for compatibility
 function fetchBrokers(){
   if(!botUrl)return;
   var sel=document.getElementById('apBrk'),lbl=document.getElementById('brkL');
@@ -955,7 +945,7 @@ function fetchBrokers(){
   });
 }
 function openAP(px){
-  alSide='buy';setAS('buy');
+  alSide='buy';
   document.getElementById('apSym').textContent=curSym;
   document.getElementById('apPx').value=px?f(px):'';
   document.getElementById('apQty').value=1;
@@ -1015,15 +1005,53 @@ function createAll6(){
   toast('✅ 6 alerts created for '+curSym+' @ '+f(price)+' | SL:'+rp+'% | RR:1:'+rr,'success');
 }
 
+function onSigTypeChange(){
+  var condSrc=document.getElementById('apCond').value;
+  var isInd=condSrc.indexOf('ind_')===0;
+  var sigType=isInd?document.getElementById('apIT').value:document.getElementById('apOp').value;
+  var isAll=sigType==='all';
+  var infoEl=document.getElementById('allInfo');
+  var okBtn=document.getElementById('apOk');
+  if(infoEl){infoEl.style.display=isAll?'block':'none';}
+  if(okBtn){okBtn.textContent=isAll?'⚡ Create All 6 Alerts':'Create Alert';okBtn.style.background=isAll?'#a78bfa':'#00d085';}
+}
+
 function confirmAl(){
   var condSrc=document.getElementById('apCond').value;
   var isInd=condSrc.indexOf('ind_')===0;
+  var sigType=isInd?document.getElementById('apIT').value:document.getElementById('apOp').value;
+
   var price=parseFloat(document.getElementById('apPx').value)||pendingPx;
-  if(!price&&isInd&&allCandles.length)price=allCandles[allCandles.length-1].close;
+  if(!price&&allCandles.length)price=allCandles[allCandles.length-1].close;
   if(!price){toast('Enter a price','warn');return;}
+
+  // If "All" selected — create all 6
+  if(sigType==='all'){
+    createAll6();return;
+  }
+
   var tfv=document.getElementById('apTF').value;
   var brkv=document.getElementById('apBrk').value;
-  var a={id:Date.now(),sym:curSym,tf:tfv==='same'?curTF:tfv,price:price,type:isInd?document.getElementById('apIT').value:alSide,side:alSide.toUpperCase(),qty:parseInt(document.getElementById('apQty').value)||1,ordType:document.getElementById('apOT').value,condition:document.getElementById('apOp').value,condSrc:condSrc,trigger:document.getElementById('apTr').value,broker:brkv,note:document.getElementById('apNote').value||(alSide.toUpperCase()+' '+curSym+' @ '+f(price)),logSheet:document.getElementById('apSh').checked,sendBot:brkv!=='none',enabled:true,fired:false,createdAt:new Date().toISOString()};
+  var side=sigType==='buy'||sigType==='buy_tgt'?'BUY':'SELL';
+  var cond=sigType==='buy'?'above':sigType==='sell'?'below':document.getElementById('apOp').value;
+  var a={
+    id:Date.now(),sym:curSym,
+    tf:tfv==='same'?curTF:tfv,
+    price:price,
+    type:sigType,
+    side:side,
+    qty:parseInt(document.getElementById('apQty').value)||1,
+    ordType:document.getElementById('apOT').value,
+    condition:cond,
+    condSrc:condSrc,
+    trigger:document.getElementById('apTr').value,
+    broker:brkv,
+    note:document.getElementById('apNote').value||(side+' '+curSym+' @ '+f(price)),
+    logSheet:document.getElementById('apSh').checked,
+    sendBot:brkv!=='none',
+    enabled:true,fired:false,
+    createdAt:new Date().toISOString()
+  };
   als.push(a);ss('av_al',als);renderAlList();renderCv();closeAP();
   toast('🔔 Alert: '+a.note,'success');
 }
@@ -1034,7 +1062,12 @@ function checkAlerts(candles){
   var changed=false;
   als.filter(function(a){return a.enabled&&!a.fired&&a.sym===curSym;}).forEach(function(a){
     var px=last.close,op=a.condition||'above';
-    var trig=op==='above'?px>=a.price:op==='below'?px<=a.price:(px>=a.price||px<=a.price);
+    var prev2=allCandles.length>=2?allCandles[allCandles.length-2].close:px;
+    // Use crossover logic — price must cross the level, not just be on one side
+    var trig=false;
+    if(op==='above')trig=(prev2<a.price&&px>=a.price);        // crossed above
+    else if(op==='below')trig=(prev2>a.price&&px<=a.price);   // crossed below
+    else if(op==='cross')trig=(prev2<a.price&&px>=a.price)||(prev2>a.price&&px<=a.price);
     if(!trig)return;
     // Grace period: don't fire within 15 seconds of creation
     var age=(Date.now()-new Date(a.createdAt).getTime())/1000;

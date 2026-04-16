@@ -810,19 +810,32 @@ function startLive(sym,tf){
   }
 }
 function stopLive(){if(tickInt){clearInterval(tickInt);tickInt=null;}if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}}
+var lastCandleTime=0; // track last candle time to detect new candle close
+
 function tickUp(c){
   if(!allCandles.length||!cs)return;
   isLiveUpdate=true;
   var last=allCandles[allCandles.length-1];
-  if(c.time>last.time){allCandles.push(c);if(allCandles.length>2000)allCandles.shift();}
-  else allCandles[allCandles.length-1]=Object.assign({},last,c);
+  var isNewCandle=c.time>last.time; // true = previous candle CLOSED, new one opened
+
+  if(isNewCandle){
+    // Previous candle is now CLOSED — fire signals based on CLOSED candle
+    var closedCandle=last; // this is the candle that just closed
+    var prevCandle=allCandles.length>=2?allCandles[allCandles.length-2]:null;
+    allCandles.push(c);
+    if(allCandles.length>2000)allCandles.shift();
+    // Fire candle color signal on CLOSED candle only
+    if(prevCandle){
+      checkCandleColorSignal(prevCandle,closedCandle);
+    }
+  } else {
+    // Same candle still forming — just update, no signal
+    allCandles[allCandles.length-1]=Object.assign({},last,c);
+  }
+
   cs.update(allCandles[allCandles.length-1]);
   vs.update({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'});
   updatePBar(c,allCandles[allCandles.length-2]||c);
-  // Check candle color signal on new candle
-  if(allCandles.length>=2){
-    checkCandleColorSignal(allCandles[allCandles.length-2],allCandles[allCandles.length-1]);
-  }
   checkAlerts([c]);renderCv();
   isLiveUpdate=false;
 }
@@ -983,17 +996,28 @@ function renderCandleColor(ind){
 }
 
 // Called by tickUp when new candle closes for candle_color indicator
+var lastCCSigTime=0; // prevent duplicate signals on same candle
+
 function checkCandleColorSignal(prevCandle,newCandle){
   if(!prevCandle||!newCandle)return;
+  // Must be a confirmed closed candle (not same candle twice)
+  if(newCandle.time===lastCCSigTime)return;
   var curGreen=newCandle.close>newCandle.open;
   var prvGreen=prevCandle.close>prevCandle.open;
-  // Only signal on color CHANGE
+  // Only signal on color CHANGE (red→green = BUY, green→red = SELL)
   if(curGreen===prvGreen)return;
+  lastCCSigTime=newCandle.time; // mark this candle as processed
   var sigType=curGreen?'buy':'sell';
   var entry=newCandle.close;
+  var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
+  var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
+  var slDist=entry*rp/100;
+  var sl=curGreen?entry-slDist:entry+slDist;
+  var tgt=curGreen?entry+slDist*rr:entry-slDist*rr;
+  console.log('[CANDLE COLOR] '+sigType.toUpperCase()+' signal @ '+entry+' SL:'+sl.toFixed(2)+' TGT:'+tgt.toFixed(2));
   // Find candle_color indicators
   inds.filter(function(i){return i.visible&&i.type==='candle_color';}).forEach(function(ind){
-    window._ccSig={type:sigType,entry:entry,ind:ind};
+    window._ccSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr,ind:ind};
     onIndicatorSignal(curSym,sigType,entry,newCandle.time);
   });
 }
@@ -1188,12 +1212,14 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
     if(age<30)return;
     // Fire alert
     a.lastFiredTime=candleTime;
-    // NEVER auto-disable — alert stays enabled, user disables manually
-    // Just record when it last fired
     a.firedAt=new Date().toISOString();
+    // Pass SL/TGT from indicator to alert
+    var sigMeta=window._ccSig||(window._emaSigs&&window._emaSigs.length?window._emaSigs[window._emaSigs.length-1]:null)||{};
+    if(!a.meta)a.meta={};
+    if(sigMeta.sl){a.meta.sl=sigMeta.sl;a.meta.tgt=sigMeta.tgt;a.meta.riskPct=sigMeta.rp||sigMeta.riskPct;a.meta.rrRatio=sigMeta.rr||sigMeta.rrRatio;a.meta.entry=sigMeta.entry||price;}
     frd.unshift(Object.assign({},a,{firedPrice:price}));frd=frd.slice(0,50);
     ss('av_fired',frd);
-    toast('🔔 '+a.note+' | '+signalType.toUpperCase()+' signal @ '+f(price),'info');
+    toast('🔔 '+a.note+' | '+signalType.toUpperCase()+' @ '+f(price),'info');
     if(a.sendBot&&botUrl)sendToBot(a,price);
     if(a.logSheet&&sheetUrl)logToSheet(a,price);
   });

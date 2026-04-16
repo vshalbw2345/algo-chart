@@ -859,6 +859,7 @@ function stopLive(){
 }
 var lastCandleTime=0; // track last candle time to detect new candle close
 var lastProcessedBar={}; // {indType_sym: candleTime} — prevents double firing
+var indPriceLines=[]; // track all indicator price lines so we can remove them
 
 function tickUp(c){
   if(!allCandles.length||!cs)return;
@@ -962,11 +963,10 @@ function renderEMACross(ind){
   window._emaSigs=sigs;window._emaInd=ind;
   if(sigs.length){
     var last2=sigs[sigs.length-1];
-    try{
-      cs.createPriceLine({price:last2.entry,color:'#fff',lineWidth:1,lineStyle:1,title:last2.type.toUpperCase()+' Entry'});
-      cs.createPriceLine({price:last2.sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+last2.rp+'%)'});
-      cs.createPriceLine({price:last2.tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+last2.rr+')'});
-    }catch(e){}
+    clearIndPriceLines();
+    addIndPriceLine({price:last2.entry,color:'#ffffff',lineWidth:1,lineStyle:1,title:last2.type.toUpperCase()+' Entry'});
+    addIndPriceLine({price:last2.sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+last2.rp+'%)'});
+    addIndPriceLine({price:last2.tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+last2.rr+')'});
     // EMA cross: only fire on live tick (not historical load)
     // onIndicatorSignal has isLiveUpdate guard so this is safe
   }
@@ -1030,11 +1030,10 @@ function renderCandleColor(ind){
     var slDist=entry*rp/100;
     var sl=latestGreen?entry-slDist:entry+slDist;
     var tgt=latestGreen?entry+slDist*rr:entry-slDist*rr;
-    try{
-      cs.createPriceLine({price:entry,color:'#fff',lineWidth:1,lineStyle:1,title:sigType.toUpperCase()+' Entry'});
-      cs.createPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
-      cs.createPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
-    }catch(e){}
+    clearIndPriceLines();
+    addIndPriceLine({price:entry,color:'#ffffff',lineWidth:1,lineStyle:1,title:sigType.toUpperCase()+' Entry'});
+    addIndPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
+    addIndPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
     window._ccSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr,ind:ind};
   }
 }
@@ -1071,10 +1070,23 @@ function checkCandleColorSignal(prevCandle,newCandle){
   var tgt=curGreen?entry+slDist*rr:entry-slDist*rr;
 
   console.log('[CANDLE COLOR] CLOSED candle '+sigType.toUpperCase()+' @ '+entry);
+  // Clear old SL/TGT lines — new signal replaces them
+  clearIndPriceLines();
+  addIndPriceLine({price:entry,color:'#ffffff',lineWidth:1,lineStyle:1,title:sigType.toUpperCase()+' Entry'});
+  addIndPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
+  addIndPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
   ccInds.forEach(function(ind){
     window._ccSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr,ind:ind};
     onIndicatorSignal(curSym,sigType,entry,newCandle.time);
   });
+}
+
+function clearIndPriceLines(){
+  indPriceLines.forEach(function(pl){try{cs.removePriceLine(pl);}catch(e){}});
+  indPriceLines=[];
+}
+function addIndPriceLine(opts){
+  try{var pl=cs.createPriceLine(opts);indPriceLines.push(pl);return pl;}catch(e){}
 }
 
 function calcMA(c,p,t){var r=[],ema=null;for(var i=0;i<c.length;i++){if(i<p-1){r.push({time:c[i].time,value:null});continue;}if(t==='sma'){r.push({time:c[i].time,value:c.slice(i-p+1,i+1).reduce(function(s,x){return s+x.close;},0)/p});}else{var k=2/(p+1);if(ema===null)ema=c.slice(0,p).reduce(function(s,x){return s+x.close;},0)/p;else ema=c[i].close*k+ema*(1-k);r.push({time:c[i].time,value:ema});}}return r;}

@@ -1456,6 +1456,15 @@ window.onload=function(){
     if(bi)bi.value=botUrl;
     testBot();
   }
+  // Auto-refresh RR config every 2 minutes
+  setInterval(function(){
+    if(!botUrl)return;
+    fetch(botUrl+'/api/risk/config')
+      .then(function(r){return r.json();})
+      .then(function(d){if(d.success&&d.config){rrCfg=d.config;console.log('[RR] Config refreshed:',JSON.stringify(rrCfg));}})
+      .catch(function(){});
+  },120000);
+
   // Load chart with slight delay to ensure layout is ready
   setTimeout(function(){
     var ca=document.getElementById('carea');

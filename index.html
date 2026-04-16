@@ -1758,35 +1758,29 @@ function startWlStream(){
 
 // ════════════════════ BOOT ══════════════════════════════════
 window.onload=function(){
-  // Wait for LightweightCharts CDN to load (max 5 seconds)
-  var attempts=0;
-  function tryInit(){
-    attempts++;
-    if(typeof LightweightCharts!=='undefined'){
-      initChart();
-      renderWl();renderIndList();renderAlList();updateCondDD();
-  // Restore bot URL
-  botUrl=localStorage.getItem('av_bot')||'';
-  sheetUrl=localStorage.getItem('av_sheet')||'';
-  if(botUrl){
-    var bi=document.getElementById('botUrlIn');
-    if(bi)bi.value=botUrl;
-    testBot();
-  }
-      // Load chart with slight delay to ensure layout is ready
-      setTimeout(function(){
+  var botUrlStored=localStorage.getItem('av_bot')||'';
+  var sheetUrlStored=localStorage.getItem('av_sheet')||'';
+  botUrl=botUrlStored;
+  sheetUrl=sheetUrlStored;
+
+  function boot(){
+    initChart();
+    renderWl();
+    renderIndList();
+    renderAlList();
+    updateCondDD();
+    if(botUrl)testBot();
+    setWL(1);
     var ca=document.getElementById('carea');
     var w=ca.offsetWidth||window.innerWidth-200;
     var h=ca.offsetHeight-38||window.innerHeight-74;
     chart.applyOptions({width:w,height:Math.max(200,h)});
     resizeCv();
-    setWL(1);
     loadSym(curSym);
     startWlStream();
     fetchBrokerDisplay();
     syncWL1fromBot();
     setInterval(syncWL1fromBot,5000);
-    // RR auto-refresh every 2 min
     setInterval(function(){
       if(!botUrl)return;
       fetch(botUrl+'/api/risk/config')
@@ -1794,14 +1788,20 @@ window.onload=function(){
         .then(function(d){if(d.success&&d.config)rrCfg=d.config;})
         .catch(function(){});
     },120000);
-      },150);
-    } else if(attempts<50){
-      setTimeout(tryInit,100); // retry every 100ms
+  }
+
+  // Wait for LightweightCharts to load
+  var t=0;
+  function waitLib(){
+    if(typeof LightweightCharts!=='undefined'){
+      boot();
+    } else if(t<50){
+      t++;setTimeout(waitLib,100);
     } else {
-      document.body.innerHTML='<div style="color:#ff4560;padding:20px;font-family:monospace">❌ Failed to load chart library. Check internet connection and refresh.</div>';
+      document.getElementById('chart').innerHTML='<div style="color:#ff4560;padding:40px;font-size:14px">❌ Chart library failed to load.<br>Check internet and refresh.</div>';
     }
   }
-  tryInit();
+  waitLib();
 };
 </script>
 <!-- Indicator plugins — add/remove without touching chart.html -->

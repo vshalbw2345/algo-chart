@@ -1082,54 +1082,71 @@ function checkCandleColorSignal(prevCandle,newCandle){
   });
 }
 
-var lastEMASigTime=0; // prevent duplicate EMA signals
+var lastEMASigType=null;  // 'buy' or 'sell' — prevents same direction repeat
+var lastEMASigTime=0;
 
 function checkEMACrossSignal(prevCandle,newCandle){
   if(!newCandle||!prevCandle)return;
-  // Only if EMA cross indicator exists and visible
+
+  // GUARD 1: EMA cross indicator must exist and be visible
   var emaInds=inds.filter(function(i){return i.visible&&i.type==='ema_cross';});
   if(!emaInds.length)return;
-  // Prevent duplicate on same candle
-  if(newCandle.time===lastEMASigTime)return;
 
-  // Calculate EMA9 and EMA15 on current candles
-  if(allCandles.length<16)return;
-  var fast=calcEMA(allCandles,9);
-  var slow=calcEMA(allCandles,15);
+  // GUARD 2: Need enough candles
+  if(allCandles.length<20)return;
+
+  // Calculate EMA on closed candles only (exclude current forming candle)
+  // allCandles[last] = new forming candle, [last-1] = just closed, [last-2] = prev closed
+  var closed=allCandles.slice(0,-1); // remove current forming candle
+  if(closed.length<16)return;
+
+  var fast=calcEMA(closed,9);
+  var slow=calcEMA(closed,15);
   var len=fast.length;
-  if(len<2)return;
 
-  var fCur=fast[len-2].value; // use closed candle (index -2 since new candle just pushed)
-  var sCur=slow[len-2].value;
-  var fPrv=fast[len-3]&&fast[len-3].value;
-  var sPrv=slow[len-3]&&slow[len-3].value;
+  var fCur=fast[len-1].value;   // just closed candle EMA9
+  var sCur=slow[len-1].value;   // just closed candle EMA15
+  var fPrv=fast[len-2]?fast[len-2].value:null; // previous candle EMA9
+  var sPrv=slow[len-2]?slow[len-2].value:null; // previous candle EMA15
+
   if(!fCur||!sCur||!fPrv||!sPrv)return;
 
+  // GUARD 3: True crossover only — EMA must actually CROSS, not just be above/below
   var sigType=null;
-  if(fPrv<=sPrv&&fCur>sCur)sigType='buy';   // crossover
-  else if(fPrv>=sPrv&&fCur<sCur)sigType='sell'; // crossunder
+  if(fPrv<=sPrv&&fCur>sCur)sigType='buy';    // EMA9 crossed above EMA15
+  else if(fPrv>=sPrv&&fCur<sCur)sigType='sell'; // EMA9 crossed below EMA15
 
   if(!sigType)return;
+
+  // GUARD 4: Don't repeat same direction — must alternate buy/sell
+  if(sigType===lastEMASigType){
+    console.log('[EMA] Skipping duplicate direction: '+sigType);
+    return;
+  }
+
+  // GUARD 5: One signal per candle bar
+  if(newCandle.time===lastEMASigTime)return;
+
+  // All guards passed — fire signal
+  lastEMASigType=sigType;
   lastEMASigTime=newCandle.time;
 
-  var entry=newCandle.open; // entry at open of new candle
+  var entry=newCandle.open;
   var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
   var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
   var slDist=entry*rp/100;
   var sl=sigType==='buy'?entry-slDist:entry+slDist;
   var tgt=sigType==='buy'?entry+slDist*rr:entry-slDist*rr;
 
-  console.log('[EMA CROSS] '+sigType.toUpperCase()+' @ '+entry+' SL:'+sl.toFixed(2)+' TGT:'+tgt.toFixed(2));
+  console.log('[EMA CROSS] ✅ '+sigType.toUpperCase()+' @ '+entry+' SL:'+sl.toFixed(2)+' TGT:'+tgt.toFixed(2));
 
-  // Update price lines
   clearIndPriceLines();
-  addIndPriceLine({price:entry,color:'#ffffff',lineWidth:1,lineStyle:1,title:'EMA '+sigType.toUpperCase()});
+  addIndPriceLine({price:entry,color:'#ffffff',lineWidth:2,lineStyle:0,title:'EMA '+sigType.toUpperCase()});
   addIndPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
   addIndPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
 
-  // Store for alert meta
   window._emaSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr};
-  window._ccSig=window._emaSig; // share with alert system
+  window._ccSig=window._emaSig;
 
   emaInds.forEach(function(ind){
     onIndicatorSignal(curSym,sigType,entry,newCandle.time);

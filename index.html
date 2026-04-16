@@ -1,6 +1,3 @@
-<script src="indicators_orb.js"></script>
-<script src="indicators_ema_cross.js"></script>
-<script src="indicators_candle_color.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -169,7 +166,8 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
   <div class="sep"></div>
   <span id="cp">—</span>
   <span id="chg" style="font-size:11px"></span>
-  <button id="bst" onclick="openBotM()" style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;border:1px solid #2a2f45;cursor:pointer;background:transparent;color:#8892aa;margin-left:6px">⚡Bot</button>
+  <div id="brokerInfo" style="font-size:10px;color:#00d085;font-weight:600;display:none"></div>
+  <button id="bst" onclick="openBotM()" style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;border:1px solid #2a2f45;cursor:pointer;background:transparent;color:#8892aa;margin-left:4px">⚡Bot</button>
   <button class="tb" id="thb" onclick="toggleTheme()" style="margin-left:4px">☀️</button>
 </div>
 
@@ -183,7 +181,15 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
     </div>
     <div id="sbody">
       <div id="st-wl">
-        <div class="adds">
+        <!-- Watchlist selector -->
+        <div style="display:flex;gap:3px;margin-bottom:6px">
+          <button class="tb" id="wlt1" onclick="setWL(1)" style="flex:1;font-size:10px;padding:4px 2px;background:#4c8eff;border-color:#4c8eff;color:#fff">WL1</button>
+          <button class="tb" id="wlt2" onclick="setWL(2)" style="flex:1;font-size:10px;padding:4px 2px">WL2</button>
+          <button class="tb" id="wlt3" onclick="setWL(3)" style="flex:1;font-size:10px;padding:4px 2px">WL3</button>
+          <div id="wl1sync" style="font-size:9px;color:#00d085;padding:4px 3px;display:none">⟳Bot</div>
+        </div>
+        <div id="wl1banner" style="display:none;font-size:9px;color:#4c8eff;padding:3px 0;margin-bottom:4px">📡 Synced from AlgoBot</div>
+        <div class="adds" id="wlAddRow">
           <input id="addIn" placeholder="BTCUSDT or SBIN" onkeydown="if(event.key==='Enter')addSym()">
           <button onclick="addSym()">+</button>
         </div>
@@ -194,6 +200,10 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
         <div id="indEl"></div>
       </div>
       <div id="st-al" style="display:none">
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="tb" style="flex:1;font-size:10px;padding:4px;text-align:center" onclick="openAP()">+ Single Alert</button>
+          <button class="tb" style="flex:1;font-size:10px;padding:4px;text-align:center;color:#a78bfa;border-color:#a78bfa40" onclick="openMassAlert()">⚡ Watchlist</button>
+        </div>
         <div id="alEl"></div>
         <div class="note" id="noAl">No alerts yet</div>
       </div>
@@ -325,6 +335,9 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
     <div id="bot">
       <button class="cal" onclick="openAP()">🔔 Create Alert</button>
       <span id="botInfo" style="font-size:10px;color:#8892aa"></span>
+      <button onclick="chart&&chart.timeScale().fitContent()" title="Auto-fit chart"
+        style="margin-left:auto;background:transparent;border:1px solid #2a2f45;color:#8892aa;
+        padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px">⊡ Fit</button>
     </div>
   </div>
 </div>
@@ -420,6 +433,10 @@ function ls(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return n
 function ss(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
 var wl  = ls('av_wl')    || ['BTCUSDT','ETHUSDT','SOLUSDT'];
+var wl2 = ls('av_wl2')   || [];
+var wl3 = ls('av_wl3')   || [];
+var curWL = 1;  // active watchlist 1, 2, or 3
+var wl1BotSynced = false; // track if WL1 came from AlgoBot
 var inds= ls('av_ind')   || [];
 var als = ls('av_al')    || [];
 var frd = ls('av_fired') || [];
@@ -1299,7 +1316,25 @@ function confirmAl(){
 
   // If "All" selected — create all 6
   if(sigType==='all'){
+    if(window._massAlertList&&window._massAlertList.length>1){
+      var origSym=curSym;
+      window._massAlertList.forEach(function(sym){
+        curSym=sym;
+        document.getElementById('apSym').textContent=sym;
+        createAll6();
+      });
+      curSym=origSym;
+      window._massAlertList=null;
+      closeAP();
+      toast('✅ Mass alerts created for all watchlist stocks','success');
+      return;
+    }
     createAll6();return;
+  }
+  // Handle edit mode
+  if(window._editAlertId){
+    als=als.filter(function(a){return a.id!==window._editAlertId;});
+    window._editAlertId=null;
   }
 
   var tfv=document.getElementById('apTF').value;
@@ -1495,11 +1530,16 @@ function testBot(){
 function addSym(){
   var s=document.getElementById('addIn').value.trim().toUpperCase();if(!s)return;
   if(s.indexOf('.')<0&&s.indexOf('USDT')<0&&s.indexOf('BTC')<0&&s.length<=10)s+='.NS';
-  if(wl.indexOf(s)<0)wl.push(s);
-  ss('av_wl',wl);document.getElementById('addIn').value='';
+  var list=curWlData();
+  if(list.indexOf(s)<0)list.push(s);
+  saveCurWl();document.getElementById('addIn').value='';
   renderWl();loadSym(s);
 }
-function removeSym(s){wl=wl.filter(function(x){return x!==s;});ss('av_wl',wl);renderWl();}
+function removeSym(s){
+  var list=curWlData();
+  var idx=list.indexOf(s);if(idx>-1)list.splice(idx,1);
+  saveCurWl();renderWl();
+}
 function loadSym(s){curSym=s;document.getElementById('si').value=s;document.getElementById('apSym').textContent=s;renderWl();loadCandles(s,curTF);}
 
 function filterSym(q){
@@ -1520,9 +1560,116 @@ function setTF(tf){
 }
 
 // ════════════════════ RENDER ════════════════════════════════
+// ═══════════════ WATCHLIST 1/2/3 ═══════════════════════
+function setWL(n){
+  curWL=n;
+  ['wlt1','wlt2','wlt3'].forEach(function(id,i){
+    var el=document.getElementById(id);
+    if(!el)return;
+    if(i+1===n){el.style.background='#4c8eff';el.style.borderColor='#4c8eff';el.style.color='#fff';}
+    else{el.style.background='transparent';el.style.borderColor='#2a2f45';el.style.color='#8892aa';}
+  });
+  var banner=document.getElementById('wl1banner');
+  if(banner)banner.style.display=(n===1&&wl1BotSynced)?'block':'none';
+  var addRow=document.getElementById('wlAddRow');
+  if(addRow)addRow.style.display=n===1?'none':'flex'; // WL1 is bot-managed
+  renderWl();
+}
+
+function curWlData(){
+  if(curWL===2)return wl2;
+  if(curWL===3)return wl3;
+  return wl;
+}
+function saveCurWl(){
+  if(curWL===2)ss('av_wl2',wl2);
+  else if(curWL===3)ss('av_wl3',wl3);
+  else ss('av_wl',wl);
+}
+
+// Sync WL1 from AlgoBot every 5 seconds
+function syncWL1fromBot(){
+  if(!botUrl)return;
+  fetch(botUrl+'/api/stocks/list',{signal:AbortSignal.timeout(4000)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.success||!d.stocks||!d.stocks.length)return;
+      // Convert Fyers format (NSE:SBIN-EQ) to Yahoo format (SBIN.NS)
+      var converted=d.stocks.map(function(s){
+        return s.replace('NSE:','').replace('-EQ','.NS');
+      });
+      // Only update if changed
+      var changed=JSON.stringify(converted)!==JSON.stringify(wl);
+      if(changed){
+        wl=converted;ss('av_wl',wl);
+        wl1BotSynced=true;
+        if(curWL===1)renderWl();
+        var sync=document.getElementById('wl1sync');
+        if(sync){sync.style.display='block';setTimeout(function(){sync.style.display='none';},2000);}
+        console.log('[WL1] Synced from AlgoBot:',wl.length,'stocks');
+      }
+    })
+    .catch(function(){});
+}
+
+// Fetch broker info for display
+function fetchBrokerDisplay(){
+  if(!botUrl)return;
+  Promise.all([
+    fetch(botUrl+'/api/auth/status',{signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}).catch(function(){return{};}),
+    fetch(botUrl+'/api/delta/status',{signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}).catch(function(){return{apis:[]};})
+  ]).then(function(res){
+    var fd=res[0],dd=res[1];
+    var parts=[];
+    if(fd.isAuthenticated&&fd.profile){
+      parts.push('Fyers: '+(fd.profile.name||fd.profile.email||'Connected').split(' ')[0]);
+    }
+    (dd.apis||[]).filter(function(a){return a.connected;}).forEach(function(a){
+      parts.push('Delta: '+a.name);
+    });
+    var el=document.getElementById('brokerInfo');
+    if(el&&parts.length){el.textContent='🏦 '+parts.join(' | ');el.style.display='block';}
+  });
+}
+
+// Mass alert — apply to all stocks in current watchlist
+function openMassAlert(){
+  var list=curWlData();
+  if(!list.length){toast('Watchlist is empty','warn');return;}
+  var conf=confirm('Create alerts for ALL '+list.length+' stocks in Watchlist '+curWL+'?
+
+This will create 6 alerts per stock ('+list.length*6+' total).
+Ensure indicator is selected and price is set.');
+  if(!conf)return;
+  openAP(); // open normal panel — user sets params once for all
+  // After confirm, we'll apply to all symbols
+  window._massAlertList=list;
+  document.getElementById('apOk').textContent='⚡ Apply to All '+list.length+' Stocks';
+  document.getElementById('apOk').style.background='#a78bfa';
+}
+
+// Alert edit modal
+function editAlert(id){
+  var a=als.find(function(x){return x.id===id;});
+  if(!a)return;
+  pendingPx=a.price;
+  openAP(a.price);
+  // Pre-fill
+  document.getElementById('apPx').value=a.price;
+  document.getElementById('apQty').value=a.qty||1;
+  document.getElementById('apOT').value=a.ordType||'MARKET';
+  document.getElementById('apTF').value='same';
+  document.getElementById('apNote').value=a.note||'';
+  document.getElementById('apTr').value=a.trigger||'once';
+  // Mark as edit
+  window._editAlertId=id;
+  document.getElementById('apOk').textContent='Update Alert';
+}
+
 function renderWl(){
   var el=document.getElementById('wlEl');if(!el)return;
-  el.innerHTML=wl.map(function(s){
+  var wlData=curWlData();
+  el.innerHTML=wlData.map(function(s){
     var info=ALL.find(function(x){return x.s===s;});
     var px=liveData[s]?f(liveData[s]):'—';
     return '<div class="wr'+(s===curSym?' on':'')+'" data-s="'+s+'" onclick="loadSym(\''+s+'\')">'
@@ -1555,7 +1702,7 @@ function renderAlList(){
     return '<div class="ar '+(a.type.indexOf('buy')===0?'b':'s')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:11px;font-weight:700;color:'+c+';overflow:hidden;max-width:120px;text-overflow:ellipsis;white-space:nowrap" title="'+(a.note||'')+'">'+(a.note||a.type.toUpperCase()+' @ '+f(a.price))+'</span>'
-      +'<div style="display:flex;gap:3px;align-items:center;flex-shrink:0"><button class="tog'+(a.enabled&&!a.fired?' on':'')+'" onclick="toggleAl('+a.id+')"></button><button class="xb del" onclick="deleteAl('+a.id+')">✕</button></div>'
+      +'<div style="display:flex;gap:3px;align-items:center;flex-shrink:0"><button class="tog'+(a.enabled&&!a.fired?' on':'')+'" onclick="toggleAl('+a.id+')"></button><button class="xb" onclick="editAlert('+a.id+')" title="Edit">✏</button><button class="xb del" onclick="deleteAl('+a.id+')">✕</button></div>'
       +'</div><div style="font-size:9px;color:#8892aa;margin-top:2px">'+f(a.price)+' x'+(a.qty||1)+' · '+(a.tf||curTF).toUpperCase()+' '+(a.sendBot?'🤖':'')+' '+(a.firedAt?'✅ Fired':'')+'</div>'
       +'</div>';
   }).join('');
@@ -1603,15 +1750,6 @@ window.onload=function(){
     if(bi)bi.value=botUrl;
     testBot();
   }
-  // Auto-refresh RR config every 2 minutes
-  setInterval(function(){
-    if(!botUrl)return;
-    fetch(botUrl+'/api/risk/config')
-      .then(function(r){return r.json();})
-      .then(function(d){if(d.success&&d.config){rrCfg=d.config;console.log('[RR] Config refreshed:',JSON.stringify(rrCfg));}})
-      .catch(function(){});
-  },120000);
-
   // Load chart with slight delay to ensure layout is ready
   setTimeout(function(){
     var ca=document.getElementById('carea');
@@ -1619,10 +1757,26 @@ window.onload=function(){
     var h=ca.offsetHeight-38||window.innerHeight-74;
     chart.applyOptions({width:w,height:Math.max(200,h)});
     resizeCv();
+    setWL(1);
     loadSym(curSym);
     startWlStream();
+    fetchBrokerDisplay();
+    syncWL1fromBot();
+    setInterval(syncWL1fromBot,5000);
+    // RR auto-refresh every 2 min
+    setInterval(function(){
+      if(!botUrl)return;
+      fetch(botUrl+'/api/risk/config')
+        .then(function(r){return r.json();})
+        .then(function(d){if(d.success&&d.config)rrCfg=d.config;})
+        .catch(function(){});
+    },120000);
   },150);
 };
 </script>
+<!-- Indicator plugins — add/remove without touching chart.html -->
+<script src="indicators_ema_cross.js"></script>
+<script src="indicators_candle_color.js"></script>
+<script src="indicators_orb.js"></script>
 </body>
 </html>

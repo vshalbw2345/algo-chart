@@ -791,6 +791,53 @@ function yDirect(sym,tf){
 }
 
 // ════════════════════ LIVE FEED ═════════════════════════════
+var wsRetryCount=0;
+var wsRetryTimer=null;
+
+function connectBinanceWS(sym,tf){
+  // Clear any pending retry
+  if(wsRetryTimer){clearTimeout(wsRetryTimer);wsRetryTimer=null;}
+  if(liveWs){try{liveWs.close();}catch(e){}}
+
+  var url='wss://stream.binance.com:9443/ws/'+sym.toLowerCase()+'@kline_'+(BN_IV[tf]||tf);
+  console.log('[WS] Connecting:',url);
+  liveWs=new WebSocket(url);
+
+  liveWs.onopen=function(){
+    wsRetryCount=0;
+    setDot('green');
+    console.log('[WS] Connected');
+  };
+
+  liveWs.onmessage=function(e){
+    try{
+      var d=JSON.parse(e.data);
+      var k=d.k;if(!k)return;
+      var candle={time:Math.floor(k.t/1000),open:+k.o,high:+k.h,low:+k.l,close:+k.c,volume:+k.v};
+      tickUp(candle);
+      liveData[sym]=candle.close;
+      renderWl();
+    }catch(ex){console.error('[WS] Parse error:',ex);}
+  };
+
+  liveWs.onerror=function(e){
+    console.warn('[WS] Error — will reconnect');
+    setDot('red');
+  };
+
+  liveWs.onclose=function(e){
+    if(curSym!==sym)return; // symbol changed — don't reconnect old sym
+    setDot('orange');
+    wsRetryCount++;
+    // Exponential backoff: 2s, 4s, 8s, max 30s
+    var delay=Math.min(2000*Math.pow(2,wsRetryCount-1),30000);
+    console.log('[WS] Closed. Reconnecting in '+delay+'ms (attempt '+wsRetryCount+')');
+    wsRetryTimer=setTimeout(function(){
+      if(curSym===sym)connectBinanceWS(sym,tf);
+    },delay);
+  };
+}
+
 function startLive(sym,tf){
   if(isI(sym)){
     tickInt=setInterval(function(){
@@ -798,18 +845,18 @@ function startLive(sym,tf){
     },5000);
     setDot('green');
   }else{
-    if(liveWs){try{liveWs.close();}catch(e){}}
-    liveWs=new WebSocket('wss://stream.binance.com:9443/ws/'+sym.toLowerCase()+'@kline_'+(BN_IV[tf]||tf));
-    liveWs.onmessage=function(e){
-      var k=JSON.parse(e.data).k;if(!k)return;
-      var c={time:Math.floor(k.t/1000),open:+k.o,high:+k.h,low:+k.l,close:+k.c,volume:+k.v};
-      tickUp(c);liveData[sym]=c.close;renderWl();
-    };
-    liveWs.onopen=function(){setDot('green');};
-    liveWs.onerror=function(){setDot('red');setTimeout(function(){startLive(sym,tf);},3000);};
+    connectBinanceWS(sym,tf);
   }
 }
-function stopLive(){if(tickInt){clearInterval(tickInt);tickInt=null;}if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}}
+function stopLive(){
+  if(wsRetryTimer){clearTimeout(wsRetryTimer);wsRetryTimer=null;}
+  if(tickInt){clearInterval(tickInt);tickInt=null;}
+  if(liveWs){
+    liveWs.onclose=null; // prevent auto-reconnect on manual stop
+    try{liveWs.close();}catch(e){}
+    liveWs=null;
+  }
+}
 var lastCandleTime=0; // track last candle time to detect new candle close
 var lastProcessedBar={}; // {indType_sym: candleTime} — prevents double firing
 

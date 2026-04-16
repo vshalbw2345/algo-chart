@@ -811,6 +811,7 @@ function startLive(sym,tf){
 }
 function stopLive(){if(tickInt){clearInterval(tickInt);tickInt=null;}if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}}
 var lastCandleTime=0; // track last candle time to detect new candle close
+var lastProcessedBar={}; // {indType_sym: candleTime} — prevents double firing
 
 function tickUp(c){
   if(!allCandles.length||!cs)return;
@@ -1002,6 +1003,10 @@ function checkCandleColorSignal(prevCandle,newCandle){
 
   // STRICT GUARD 2: must be confirmed closed candle (new timestamp)
   if(newCandle.time===lastCCSigTime)return;
+  // STRICT GUARD: one signal per candle bar per symbol
+  var barKey='cc_'+curSym+'_'+newCandle.time;
+  if(lastProcessedBar[barKey])return;
+  lastProcessedBar[barKey]=true;
 
   var curGreen=newCandle.close>newCandle.open;
   var prvGreen=prevCandle.close>prevCandle.open;
@@ -1185,15 +1190,16 @@ var isLiveUpdate=false; // true ONLY during live tick, not historical load
 // Called by renderEMACross when new signal detected on latest candle
 function onIndicatorSignal(sym,signalType,price,candleTime){
   // ONLY fire on live tick updates, never on historical load
-  if(!isLiveUpdate)return;
-  // Store latest signal
-  if(!lastEmaSignal[sym])lastEmaSignal[sym]={};
-  var prev=lastEmaSignal[sym];
-  // Only process if this is a NEW candle signal (different bar)
-  if(prev.time===candleTime&&prev.type===signalType)return;
-  lastEmaSignal[sym]={type:signalType,time:candleTime,price:price};
-  console.log('[SIGNAL] EMA '+signalType+' @ '+price+' on '+sym);
-  toast('📊 EMA Signal: '+signalType.toUpperCase()+' '+sym+' @ '+f(price),'info');
+  if(!isLiveUpdate){console.log('[BLOCKED] not live');return;}
+  // One signal per candle bar per symbol per signalType
+  var key=sym+'_'+signalType+'_'+candleTime;
+  if(lastEmaSignal[key]){console.log('[BLOCKED] duplicate bar signal');return;}
+  lastEmaSignal[key]=true;
+  // Cleanup old keys to prevent memory leak
+  var keys=Object.keys(lastEmaSignal);
+  if(keys.length>100){delete lastEmaSignal[keys[0]];}
+  console.log('[SIGNAL] '+signalType.toUpperCase()+' @ '+price+' on '+sym+' candle:'+candleTime);
+  toast('📊 Signal: '+signalType.toUpperCase()+' '+sym+' @ '+f(price),'info');
 
   // Find all enabled alerts for this symbol linked to indicator
   // Only match alerts whose condSrc matches an ACTUAL existing indicator

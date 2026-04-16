@@ -338,6 +338,7 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
     <label class="ml">Type</label>
     <select class="ms" id="itype" style="margin-bottom:6px">
       <option value="ema_cross">EMA Crossover (9×15) — Buy/Sell Signals</option>
+      <option value="candle_color">Candle Color — Green=BUY / Red=SELL</option>
       <option value="sma">SMA</option>
       <option value="ema">EMA (single)</option>
       <option value="bb">Bollinger Bands (20,2)</option>
@@ -818,6 +819,10 @@ function tickUp(c){
   cs.update(allCandles[allCandles.length-1]);
   vs.update({time:c.time,value:c.volume||0,color:c.close>=c.open?'#00d08520':'#ff456020'});
   updatePBar(c,allCandles[allCandles.length-2]||c);
+  // Check candle color signal on new candle
+  if(allCandles.length>=2){
+    checkCandleColorSignal(allCandles[allCandles.length-2],allCandles[allCandles.length-1]);
+  }
   checkAlerts([c]);renderCv();
   isLiveUpdate=false;
 }
@@ -862,6 +867,7 @@ function renderIndData(){
   inds.filter(function(i){return i.visible&&i.type!=='pine';}).forEach(function(ind){
     try{
       if(ind.type==='ema_cross'){renderEMACross(ind);}
+      else if(ind.type==='candle_color'){renderCandleColor(ind);}
       else if(ind.type==='sma'||ind.type==='ema'){var s=chart.addLineSeries({color:ind.color,lineWidth:1,title:ind.name,lastValueVisible:true,priceLineVisible:false});s.setData(calcMA(allCandles,ind.period,ind.type).filter(function(v){return v.value!=null;}));indSeries[ind.id]=s;}
       else if(ind.type==='bb'){var r=calcBB(allCandles,20,2);['u','m','l'].forEach(function(k,i){var s=chart.addLineSeries({color:i===1?ind.color+'80':ind.color,lineWidth:1,lastValueVisible:false,priceLineVisible:false});s.setData([r.upper,r.mid,r.lower][i].filter(function(v){return v.value!=null;}));indSeries[ind.id+'_'+k]=s;});}
       else if(ind.type==='vwap'){var s=chart.addLineSeries({color:ind.color,lineWidth:2,title:'VWAP',lastValueVisible:true,priceLineVisible:false});s.setData(calcVWAP(allCandles).filter(function(v){return v.value!=null;}));indSeries[ind.id]=s;}
@@ -932,6 +938,66 @@ function createEMAAlerts(){
   ss('av_al',als);renderAlList();renderCv();
   toast('✅ 3 EMA alerts created','success');
 }
+// ══════════════ CANDLE COLOR INDICATOR ══════════════════
+function renderCandleColor(ind){
+  // Draw markers on every candle: green=buy, red=sell
+  var markers=[];
+  // Only mark candles where color changed (new signal)
+  for(var i=1;i<allCandles.length;i++){
+    var cur=allCandles[i];
+    var prv=allCandles[i-1];
+    var curGreen=cur.close>cur.open;
+    var prvGreen=prv.close>prv.open;
+    // Signal on color change only
+    if(curGreen&&!prvGreen){
+      markers.push({time:cur.time,position:'belowBar',color:'#00d085',shape:'arrowUp',text:'BUY'});
+    } else if(!curGreen&&prvGreen){
+      markers.push({time:cur.time,position:'aboveBar',color:'#ff4560',shape:'arrowDown',text:'SELL'});
+    }
+  }
+  // Add markers to candle series
+  if(markers.length){
+    try{cs.setMarkers(markers);}catch(e){}
+  }
+
+  // Draw SL/TGT lines for latest signal
+  if(allCandles.length>=2){
+    var latestCandle=allCandles[allCandles.length-1];
+    var prevCandle=allCandles[allCandles.length-2];
+    var latestGreen=latestCandle.close>latestCandle.open;
+    var prevGreen=prevCandle.close>prevCandle.open;
+    var sigType=latestGreen?'buy':'sell';
+    var entry=latestCandle.close;
+    var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
+    var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
+    var slDist=entry*rp/100;
+    var sl=latestGreen?entry-slDist:entry+slDist;
+    var tgt=latestGreen?entry+slDist*rr:entry-slDist*rr;
+    try{
+      cs.createPriceLine({price:entry,color:'#fff',lineWidth:1,lineStyle:1,title:sigType.toUpperCase()+' Entry'});
+      cs.createPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
+      cs.createPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
+    }catch(e){}
+    window._ccSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr,ind:ind};
+  }
+}
+
+// Called by tickUp when new candle closes for candle_color indicator
+function checkCandleColorSignal(prevCandle,newCandle){
+  if(!prevCandle||!newCandle)return;
+  var curGreen=newCandle.close>newCandle.open;
+  var prvGreen=prevCandle.close>prevCandle.open;
+  // Only signal on color CHANGE
+  if(curGreen===prvGreen)return;
+  var sigType=curGreen?'buy':'sell';
+  var entry=newCandle.close;
+  // Find candle_color indicators
+  inds.filter(function(i){return i.visible&&i.type==='candle_color';}).forEach(function(ind){
+    window._ccSig={type:sigType,entry:entry,ind:ind};
+    onIndicatorSignal(curSym,sigType,entry,newCandle.time);
+  });
+}
+
 function calcMA(c,p,t){var r=[],ema=null;for(var i=0;i<c.length;i++){if(i<p-1){r.push({time:c[i].time,value:null});continue;}if(t==='sma'){r.push({time:c[i].time,value:c.slice(i-p+1,i+1).reduce(function(s,x){return s+x.close;},0)/p});}else{var k=2/(p+1);if(ema===null)ema=c.slice(0,p).reduce(function(s,x){return s+x.close;},0)/p;else ema=c[i].close*k+ema*(1-k);r.push({time:c[i].time,value:ema});}}return r;}
 function calcBB(c,p,m){var u=[],mi=[],lo=[];for(var i=0;i<c.length;i++){if(i<p-1){u.push({time:c[i].time,value:null});mi.push({time:c[i].time,value:null});lo.push({time:c[i].time,value:null});continue;}var sl=c.slice(i-p+1,i+1).map(function(x){return x.close;});var mean=sl.reduce(function(s,v){return s+v;},0)/p;var sd=Math.sqrt(sl.reduce(function(s,v){return s+(v-mean)*(v-mean);},0)/p);u.push({time:c[i].time,value:mean+m*sd});mi.push({time:c[i].time,value:mean});lo.push({time:c[i].time,value:mean-m*sd});}return{upper:u,mid:mi,lower:lo};}
 function calcVWAP(c){var ct=0,cv=0;return c.map(function(x){var tp=(x.high+x.low+x.close)/3;ct+=tp*(x.volume||1);cv+=(x.volume||1);return{time:x.time,value:cv?ct/cv:null};});}

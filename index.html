@@ -1758,8 +1758,13 @@ function startWlStream(){
 
 // ════════════════════ BOOT ══════════════════════════════════
 window.onload=function(){
-  initChart();
-  renderWl();renderIndList();renderAlList();updateCondDD();
+  // Wait for LightweightCharts CDN to load (max 5 seconds)
+  var attempts=0;
+  function tryInit(){
+    attempts++;
+    if(typeof LightweightCharts!=='undefined'){
+      initChart();
+      renderWl();renderIndList();renderAlList();updateCondDD();
   // Restore bot URL
   botUrl=localStorage.getItem('av_bot')||'';
   sheetUrl=localStorage.getItem('av_sheet')||'';
@@ -1768,8 +1773,8 @@ window.onload=function(){
     if(bi)bi.value=botUrl;
     testBot();
   }
-  // Load chart with slight delay to ensure layout is ready
-  setTimeout(function(){
+      // Load chart with slight delay to ensure layout is ready
+      setTimeout(function(){
     var ca=document.getElementById('carea');
     var w=ca.offsetWidth||window.innerWidth-200;
     var h=ca.offsetHeight-38||window.innerHeight-74;
@@ -1789,7 +1794,14 @@ window.onload=function(){
         .then(function(d){if(d.success&&d.config)rrCfg=d.config;})
         .catch(function(){});
     },120000);
-  },150);
+      },150);
+    } else if(attempts<50){
+      setTimeout(tryInit,100); // retry every 100ms
+    } else {
+      document.body.innerHTML='<div style="color:#ff4560;padding:20px;font-family:monospace">❌ Failed to load chart library. Check internet connection and refresh.</div>';
+    }
+  }
+  tryInit();
 };
 </script>
 <!-- Indicator plugins — add/remove without touching chart.html -->

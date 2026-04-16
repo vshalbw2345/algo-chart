@@ -873,9 +873,10 @@ function tickUp(c){
     var prevCandle=allCandles.length>=2?allCandles[allCandles.length-2]:null;
     allCandles.push(c);
     if(allCandles.length>2000)allCandles.shift();
-    // Fire candle color signal on CLOSED candle only
+    // Fire signals on CLOSED candle only
     if(prevCandle){
       checkCandleColorSignal(prevCandle,closedCandle);
+      checkEMACrossSignal(prevCandle,closedCandle);
     }
   } else {
     // Same candle still forming — just update, no signal
@@ -1081,6 +1082,72 @@ function checkCandleColorSignal(prevCandle,newCandle){
   });
 }
 
+var lastEMASigTime=0; // prevent duplicate EMA signals
+
+function checkEMACrossSignal(prevCandle,newCandle){
+  if(!newCandle||!prevCandle)return;
+  // Only if EMA cross indicator exists and visible
+  var emaInds=inds.filter(function(i){return i.visible&&i.type==='ema_cross';});
+  if(!emaInds.length)return;
+  // Prevent duplicate on same candle
+  if(newCandle.time===lastEMASigTime)return;
+
+  // Calculate EMA9 and EMA15 on current candles
+  if(allCandles.length<16)return;
+  var fast=calcEMA(allCandles,9);
+  var slow=calcEMA(allCandles,15);
+  var len=fast.length;
+  if(len<2)return;
+
+  var fCur=fast[len-2].value; // use closed candle (index -2 since new candle just pushed)
+  var sCur=slow[len-2].value;
+  var fPrv=fast[len-3]&&fast[len-3].value;
+  var sPrv=slow[len-3]&&slow[len-3].value;
+  if(!fCur||!sCur||!fPrv||!sPrv)return;
+
+  var sigType=null;
+  if(fPrv<=sPrv&&fCur>sCur)sigType='buy';   // crossover
+  else if(fPrv>=sPrv&&fCur<sCur)sigType='sell'; // crossunder
+
+  if(!sigType)return;
+  lastEMASigTime=newCandle.time;
+
+  var entry=newCandle.open; // entry at open of new candle
+  var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
+  var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||2;
+  var slDist=entry*rp/100;
+  var sl=sigType==='buy'?entry-slDist:entry+slDist;
+  var tgt=sigType==='buy'?entry+slDist*rr:entry-slDist*rr;
+
+  console.log('[EMA CROSS] '+sigType.toUpperCase()+' @ '+entry+' SL:'+sl.toFixed(2)+' TGT:'+tgt.toFixed(2));
+
+  // Update price lines
+  clearIndPriceLines();
+  addIndPriceLine({price:entry,color:'#ffffff',lineWidth:1,lineStyle:1,title:'EMA '+sigType.toUpperCase()});
+  addIndPriceLine({price:sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+rp+'%)'});
+  addIndPriceLine({price:tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+rr+')'});
+
+  // Store for alert meta
+  window._emaSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr};
+  window._ccSig=window._emaSig; // share with alert system
+
+  emaInds.forEach(function(ind){
+    onIndicatorSignal(curSym,sigType,entry,newCandle.time);
+  });
+}
+
+// Standalone EMA calculator (doesn't need full chart render)
+function calcEMA(candles,period){
+  var r=[],ema=null,k=2/(period+1);
+  for(var i=0;i<candles.length;i++){
+    if(i<period-1){r.push({time:candles[i].time,value:null});continue;}
+    if(ema===null)ema=candles.slice(0,period).reduce(function(s,x){return s+x.close;},0)/period;
+    else ema=candles[i].close*k+ema*(1-k);
+    r.push({time:candles[i].time,value:ema});
+  }
+  return r;
+}
+
 function clearIndPriceLines(){
   indPriceLines.forEach(function(pl){try{cs.removePriceLine(pl);}catch(e){}});
   indPriceLines=[];
@@ -1262,6 +1329,7 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
 
   // Find all enabled alerts for this symbol linked to indicator
   // Only match alerts whose condSrc matches an ACTUAL existing indicator
+  // Auto-clean orphaned alerts (indicator was deleted)
   var matchedAlerts=als.filter(function(a){
     if(!a.enabled)return false;
     if(a.sym!==sym)return false;

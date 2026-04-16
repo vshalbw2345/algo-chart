@@ -919,12 +919,8 @@ function renderEMACross(ind){
       cs.createPriceLine({price:last2.sl,color:'#ff4560',lineWidth:1,lineStyle:2,title:'SL('+last2.rp+'%)'});
       cs.createPriceLine({price:last2.tgt,color:'#00d085',lineWidth:1,lineStyle:2,title:'TGT(1:'+last2.rr+')'});
     }catch(e){}
-    // Check if last signal is on the latest candle — trigger alert if so
-    var latestCandle=allCandles[allCandles.length-1];
-    if(latestCandle&&last2.time===latestCandle.time){
-      // NEW signal on latest candle — notify indicator alert system
-      onIndicatorSignal(curSym,last2.type,last2.entry,last2.time);
-    }
+    // EMA cross: only fire on live tick (not historical load)
+    // onIndicatorSignal has isLiveUpdate guard so this is safe
   }
 }
 function createEMAAlerts(){
@@ -1000,13 +996,20 @@ var lastCCSigTime=0; // prevent duplicate signals on same candle
 
 function checkCandleColorSignal(prevCandle,newCandle){
   if(!prevCandle||!newCandle)return;
-  // Must be a confirmed closed candle (not same candle twice)
+  // STRICT GUARD 1: candle_color indicator must be added and visible
+  var ccInds=inds.filter(function(i){return i.visible&&i.type==='candle_color';});
+  if(!ccInds.length)return; // no indicator added = no signal ever
+
+  // STRICT GUARD 2: must be confirmed closed candle (new timestamp)
   if(newCandle.time===lastCCSigTime)return;
+
   var curGreen=newCandle.close>newCandle.open;
   var prvGreen=prevCandle.close>prevCandle.open;
-  // Only signal on color CHANGE (red→green = BUY, green→red = SELL)
+
+  // STRICT GUARD 3: only on color CHANGE
   if(curGreen===prvGreen)return;
-  lastCCSigTime=newCandle.time; // mark this candle as processed
+
+  lastCCSigTime=newCandle.time;
   var sigType=curGreen?'buy':'sell';
   var entry=newCandle.close;
   var rp=isI(curSym)?rrCfg.riskPct||2:rrCfg.cryptoRiskPct||2;
@@ -1014,9 +1017,9 @@ function checkCandleColorSignal(prevCandle,newCandle){
   var slDist=entry*rp/100;
   var sl=curGreen?entry-slDist:entry+slDist;
   var tgt=curGreen?entry+slDist*rr:entry-slDist*rr;
-  console.log('[CANDLE COLOR] '+sigType.toUpperCase()+' signal @ '+entry+' SL:'+sl.toFixed(2)+' TGT:'+tgt.toFixed(2));
-  // Find candle_color indicators
-  inds.filter(function(i){return i.visible&&i.type==='candle_color';}).forEach(function(ind){
+
+  console.log('[CANDLE COLOR] CLOSED candle '+sigType.toUpperCase()+' @ '+entry);
+  ccInds.forEach(function(ind){
     window._ccSig={type:sigType,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr,ind:ind};
     onIndicatorSignal(curSym,sigType,entry,newCandle.time);
   });
@@ -1193,10 +1196,23 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
   toast('📊 EMA Signal: '+signalType.toUpperCase()+' '+sym+' @ '+f(price),'info');
 
   // Find all enabled alerts for this symbol linked to indicator
+  // Only match alerts whose condSrc matches an ACTUAL existing indicator
   var matchedAlerts=als.filter(function(a){
-    return a.enabled&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
+    if(!a.enabled)return false;
+    if(a.sym!==sym)return false;
+    if(!a.condSrc||a.condSrc==='price')return false; // price alerts handled elsewhere
+    // Verify the indicator this alert is linked to still exists
+    var indId=a.condSrc.replace('ind_','');
+    var indExists=inds.some(function(i){return String(i.id)===String(indId)&&i.visible;});
+    // Also allow 'ind_ema' (EMA cross generic) and 'ind_cc' (candle color generic)
+    var isGeneric=a.condSrc==='ind_ema'||a.condSrc==='ind_cc';
+    return indExists||isGeneric;
   });
-  console.log('[SIGNAL] Matched alerts:',matchedAlerts.length);
+  if(matchedAlerts.length===0){
+    console.log('[SIGNAL] No matched alerts for '+sym+' '+signalType);
+    return;
+  }
+  console.log('[SIGNAL] '+matchedAlerts.length+' alerts matched for '+sym+' '+signalType);
   matchedAlerts.forEach(function(a){
     var match=false;
     // BUY crossover signal fires: buy entry, buy_sl exit (stop hit), buy_tgt exit (target hit)

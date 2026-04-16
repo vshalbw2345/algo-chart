@@ -1099,11 +1099,15 @@ function onIndicatorSignal(sym,signalType,price,candleTime){
   // Only process if this is a NEW candle signal (different bar)
   if(prev.time===candleTime&&prev.type===signalType)return;
   lastEmaSignal[sym]={type:signalType,time:candleTime,price:price};
+  console.log('[SIGNAL] EMA '+signalType+' @ '+price+' on '+sym);
+  toast('📊 EMA Signal: '+signalType.toUpperCase()+' '+sym+' @ '+f(price),'info');
 
   // Find all enabled alerts for this symbol linked to indicator
-  als.filter(function(a){
+  var matchedAlerts=als.filter(function(a){
     return a.enabled&&a.sym===sym&&a.condSrc&&a.condSrc.indexOf('ind_')===0;
-  }).forEach(function(a){
+  });
+  console.log('[SIGNAL] Matched alerts:',matchedAlerts.length);
+  matchedAlerts.forEach(function(a){
     var match=false;
     // BUY crossover signal fires: buy entry, buy_sl exit (stop hit), buy_tgt exit (target hit)
     if(signalType==='buy'&&(a.type==='buy'))match=true;
@@ -1163,11 +1167,43 @@ function checkAlerts(candles){
 
 // ════════════════════ BOT ═══════════════════════════════════
 function sendToBot(alert,price){
+  if(!botUrl){toast('⚠️ Bot URL not set. Configure in Bot Config.','warn');return;}
   var side=(alert.type==='buy'||alert.type==='buy_tgt')?'BUY':(alert.type==='sell'||alert.type==='sell_tgt')?'SELL':(alert.type==='buy_sl')?'SELL':'BUY';
-  fetch(botUrl+'/api/alerts/webhook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:alert.sym,side:side,price:price||alert.price,type:alert.type,tf:alert.tf||curTF,qty:alert.qty||1,orderType:alert.ordType||'MARKET',broker:alert.broker||'auto',note:alert.note||'',source:'chart',sl:alert.meta&&alert.meta.sl,tgt:alert.meta&&alert.meta.tgt,riskPct:alert.meta&&alert.meta.riskPct,rrRatio:alert.meta&&alert.meta.rrRatio,timestamp:new Date().toISOString()})})
-  .then(function(r){return r.json();})
-  .then(function(d){if(d.success)toast('✅ '+side+' '+alert.sym+' → '+(d.broker||'BOT').toUpperCase(),'success');else toast('❌ '+(d.error||'Order failed'),'error');})
-  .catch(function(e){toast('❌ Bot: '+e.message,'error');});
+  var payload={
+    symbol:alert.sym,side:side,price:price||alert.price,
+    type:alert.type,tf:alert.tf||curTF,
+    qty:alert.qty||1,orderType:alert.ordType||'MARKET',
+    broker:alert.broker||'auto',note:alert.note||'',
+    source:'chart',
+    sl:alert.meta&&alert.meta.sl,
+    tgt:alert.meta&&alert.meta.tgt,
+    riskPct:alert.meta&&alert.meta.riskPct,
+    rrRatio:alert.meta&&alert.meta.rrRatio,
+    timestamp:new Date().toISOString()
+  };
+  toast('🚀 Sending '+side+' '+alert.sym+' to AlgoBot...','info');
+  fetch(botUrl+'/api/alerts/webhook',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify(payload)
+  })
+  .then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  })
+  .then(function(d){
+    if(d.success){
+      var broker=(d.broker||'BROKER').toUpperCase();
+      var oid=d.result&&(d.result.orderId||d.result.id)||'placed';
+      toast('✅ '+side+' '+alert.sym+' → '+broker+' | '+oid,'success');
+    } else {
+      toast('❌ '+(d.error||d.reason||'Order failed'),'error');
+    }
+  })
+  .catch(function(e){
+    toast('❌ Cannot reach AlgoBot: '+e.message,'error');
+    console.error('sendToBot error:',e);
+  });
 }
 function logToSheet(alert,price){
   if(!sheetUrl)return;
@@ -1298,7 +1334,14 @@ function startWlStream(){
 window.onload=function(){
   initChart();
   renderWl();renderIndList();renderAlList();updateCondDD();
-  if(botUrl)testBot();
+  // Restore bot URL
+  botUrl=localStorage.getItem('av_bot')||'';
+  sheetUrl=localStorage.getItem('av_sheet')||'';
+  if(botUrl){
+    var bi=document.getElementById('botUrlIn');
+    if(bi)bi.value=botUrl;
+    testBot();
+  }
   // Load chart with slight delay to ensure layout is ready
   setTimeout(function(){
     var ca=document.getElementById('carea');

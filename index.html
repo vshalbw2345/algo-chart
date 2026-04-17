@@ -1654,13 +1654,13 @@ function fetchBrokerDisplay(){
 function openMassAlert(){
   var list=curWlData();
   if(!list.length){toast('Watchlist is empty','warn');return;}
-    var conf=confirm('Create alerts for ALL '+list.length+' stocks in Watchlist '+curWL+'? This will create '+list.length*6+' alerts total.');
+  var n=list.length;
+  var conf=confirm('Create alerts for ALL '+n+' stocks in Watchlist '+curWL+'?');
   if(!conf)return;
-  openAP(); // open normal panel — user sets params once for all
-  // After confirm, we'll apply to all symbols
   window._massAlertList=list;
-  document.getElementById('apOk').textContent='⚡ Apply to All '+list.length+' Stocks';
-  document.getElementById('apOk').style.background='#a78bfa';
+  openAP();
+  var btn=document.getElementById('apOk');
+  if(btn){btn.textContent='Apply to All '+n+' Stocks';btn.style.background='#a78bfa';}
 }
 
 // Alert edit modal

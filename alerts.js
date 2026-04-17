@@ -131,26 +131,23 @@ window.AlertManager = (function(){
   }
 
   // Fire from indicator signal
-  function _checkIndicator(sym,sigType,price,candleTime){
-    // Only fire on live ticks, never on historical load
-    if(!window.isLiveUpdate){
-      console.log('[ALERT] Blocked - not live update');
-      return;
-    }
-    var key=sym+'_'+sigType+'_'+candleTime;
-    if(_fired[key]){
-      console.log('[ALERT] Blocked - duplicate key '+key);
-      return;
-    }
+  function _checkIndicator(sym,sigType,price,candleTime,firedIndId){
+    // GUARD 1: Only fire on live ticks
+    if(!window.isLiveUpdate)return;
+    // GUARD 2: Deduplicate
+    var key=sym+'_'+sigType+'_'+candleTime+'_'+(firedIndId||'x');
+    if(_fired[key])return;
     _fired[key]=true;
-    console.log('[ALERT] Firing indicator alert: '+sym+' '+sigType+' @ '+price);
     var keys=Object.keys(_fired);
     if(keys.length>200)delete _fired[keys[0]];
+    console.log('[ALERT] Firing: '+sym+' '+sigType+' @ '+price+' indId:'+firedIndId);
 
     _als.filter(function(a){
       if(!a.enabled||a.sym!==sym)return false;
       if(!a.condSrc||a.condSrc==='price')return false;
       var indId=a.condSrc.replace('ind_','');
+      // GUARD 3: Only match alerts for the EXACT indicator that fired the signal
+      if(firedIndId&&String(indId)!==String(firedIndId))return false;
       if(!window.IndMgr)return false;
       return window.IndMgr.exists(indId);
     }).forEach(function(a){
@@ -167,6 +164,7 @@ window.AlertManager = (function(){
     _save();
   }
 
+  
   function _fire(a,price){
     a.firedAt=new Date().toISOString();
     _frd.unshift(Object.assign({},a,{firedPrice:price}));
@@ -225,7 +223,7 @@ window.AlertManager = (function(){
     },
     createOne:function(a){var ok=_createOne(a);if(ok)_save();return ok;},
     checkPrice:function(candle,prev,sym){_checkPrice(candle,prev,sym);},
-    checkIndicator:function(sym,sig,price,time){_checkIndicator(sym,sig,price,time);},
+    checkIndicator:function(sym,sig,price,time,indId){_checkIndicator(sym,sig,price,time,indId);},
     toggle:function(id){var a=_als.find(function(x){return x.id===id;});if(a){a.enabled=!a.enabled;_save();}},
     delete:function(id){_als=_als.filter(function(a){return a.id!==id;});_save();},
     clearAll:function(){_als=[];_save();},

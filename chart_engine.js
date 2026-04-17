@@ -208,22 +208,28 @@ function tickUpdate(c){
     var prev=allCandles.length>=2?allCandles[allCandles.length-2]:null;
     allCandles.push(c);
     if(allCandles.length>2000)allCandles.shift();
-    // Fire indicator checks on CLOSED candle
-    if(prev){
-      if(window.INDICATORS){
-        Object.keys(window.INDICATORS).forEach(function(k){
-          var ind=window.INDICATORS[k];
-          if(ind&&ind.onCandle){
-            var sig=ind.onCandle(closed,allCandles,AlertManager.getRR());
-            if(sig){
-              AlertManager.checkIndicator(curSym,sig.type,sig.price,closed.time);
-              window._lastIndSig=sig;
-            }
-          }
-        });
-      }
+   Fire indicator checks on CLOSED candle
+    // CRITICAL: Only call onCandle for indicators user ADDED in IndMgr
+    // Never fire signals for indicators not explicitly added by user
+    if(prev&&window.IndMgr){
+      var userInds=window.IndMgr.getAll().filter(function(i){return i.visible;});
+      userInds.forEach(function(indCfg){
+        // Match user indicator type to plugin
+        var plugin=null;
+        if(indCfg.type==='orb')plugin=window.INDICATORS&&window.INDICATORS.ORB;
+        else if(indCfg.type==='ema_cross')plugin=window.INDICATORS&&window.INDICATORS.EMA_CROSS;
+        else if(indCfg.type==='candle_color')plugin=window.INDICATORS&&window.INDICATORS.CANDLE_COLOR;
+        if(!plugin||!plugin.onCandle)return;
+        var sig=plugin.onCandle(closed,allCandles,AlertManager.getRR());
+        if(sig){
+          // Pass the specific indicator ID so only its alerts fire
+          AlertManager.checkIndicator(curSym,sig.type,sig.price,closed.time,indCfg.id);
+          window._lastIndSig=sig;
+          console.log('[SIGNAL] '+indCfg.name+' '+sig.type+' @ '+sig.price);
+        }
+      });
     }
-  } else {
+      } else {
     allCandles[allCandles.length-1]=Object.assign({},last,c);
   }
   cs.update(allCandles[allCandles.length-1]);

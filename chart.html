@@ -1196,14 +1196,91 @@ function checkEMACrossSignal(prevCandle,newCandle){
 
 // ══════════════ ORB INDICATOR ══════════════════════════
 function renderORB(ind){
-  // Uses indicators_orb.js plugin
-  if(window.INDICATORS&&window.INDICATORS.ORB){
-    window._orbInd=window.INDICATORS.ORB;
-    window._orbInd.onLoad(chart,cs,allCandles,curSym,rrCfg);
-    console.log('[ORB] Loaded from plugin');
-  } else {
-    // Fallback: draw ORB levels directly
-    computeORBLines();
+  if(!allCandles.length)return;
+  _orbLevelsCache={high:null,low:null,date:null}; // reset cache
+
+  // Group candles by day, find first 5min candle per day = ORB range
+  var dayMap={};
+  allCandles.forEach(function(c){
+    var d=new Date(c.time*1000);
+    var istM=((d.getUTCHours()*60+d.getUTCMinutes())+330)%(24*60);
+    var dateStr=d.toDateString();
+    // First candle of day between 9:15-9:20 IST (555-560 mins)
+    if(istM>=555&&istM<560&&!dayMap[dateStr]){
+      dayMap[dateStr]={high:c.high,low:c.low,date:dateStr};
+    }
+  });
+
+  // Draw ORB levels for each day
+  Object.values(dayMap).forEach(function(orb){
+    try{
+      cs.createPriceLine({price:orb.high,color:'#00d085',lineWidth:1,lineStyle:2,title:'ORB H'});
+      cs.createPriceLine({price:orb.low,color:'#ff4560',lineWidth:1,lineStyle:2,title:'ORB L'});
+    }catch(e){}
+  });
+
+  // Scan history for BUY/SELL signals per Pine Script logic:
+  // BUY  = close > ORB_High AND low < ORB_High (candle crossed above)
+  // SELL = close < ORB_Low  AND high > ORB_Low  (candle crossed below)
+  var markers=[];
+  var firedDays={buy:{},sell:{}};  // one signal per direction per day
+
+  allCandles.forEach(function(c){
+    var d=new Date(c.time*1000);
+    var dateStr=d.toDateString();
+    var orb=dayMap[dateStr];
+    if(!orb)return;
+
+    var isBuy  = c.close>orb.high && c.low<orb.high;
+    var isSell = c.close<orb.low  && c.high>orb.low;
+
+    // BUY signal — only first occurrence per day
+    if(isBuy&&!firedDays.buy[dateStr]){
+      firedDays.buy[dateStr]=true;
+      markers.push({
+        time:c.time,
+        position:'belowBar',
+        color:'#00d085',
+        shape:'arrowUp',
+        text:'ORB BUY'
+      });
+      // Draw SL/TGT for last signal
+      var rp=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+      var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
+      var slD=c.close*rp/100;
+      window._lastORBSig={type:'buy',entry:c.close,sl:c.close-slD,tgt:c.close+slD*rr,rp:rp,rr:rr};
+    }
+    // SELL signal — only first occurrence per day
+    if(isSell&&!firedDays.sell[dateStr]){
+      firedDays.sell[dateStr]=true;
+      markers.push({
+        time:c.time,
+        position:'aboveBar',
+        color:'#ff4560',
+        shape:'arrowDown',
+        text:'ORB SELL'
+      });
+      var rp2=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+      var rr2=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
+      var slD2=c.close*rp2/100;
+      window._lastORBSig={type:'sell',entry:c.close,sl:c.close+slD2,tgt:c.close-slD2*rr2,rp:rp2,rr:rr2};
+    }
+  });
+
+  // Plot all markers on chart
+  if(markers.length){
+    try{cs.setMarkers(markers);}catch(e){}
+    console.log('[ORB] Plotted '+markers.length+' historical signals');
+  }
+
+  // Draw SL/TGT for latest signal
+  if(window._lastORBSig){
+    var s=window._lastORBSig;
+    clearIndPriceLines();
+    addIndPriceLine(s.entry,'#ffffff',2,0,'ORB '+s.type.toUpperCase());
+    addIndPriceLine(s.sl,'#ff4560',1,2,'SL('+s.rp+'%)');
+    addIndPriceLine(s.tgt,'#00d085',1,2,'TGT(1:'+s.rr+')');
+    window._ccSig=s;
   }
 }
 
@@ -1235,10 +1312,11 @@ function checkORBSignal(prevCandle,newCandle){
   if(window._orbInd&&window._orbInd.onCandle){
     sig=window._orbInd.onCandle(newCandle,[].concat(allCandles),rrCfg);
   } else {
-    // Fallback manual ORB check
+    // Built-in ORB check for live candle
     var levels=getORBLevels();
     if(!levels.high||!levels.low)return;
     var H=levels.high,L=levels.low;
+    // Pine Script logic: BUY = close>H AND low<H, SELL = close<L AND high>L
     var isBuy=newCandle.close>H&&newCandle.low<H;
     var isSell=newCandle.close<L&&newCandle.high>L;
     if(!isBuy&&!isSell)return;

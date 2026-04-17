@@ -1238,64 +1238,61 @@ function renderORB(ind){
     }
   });
 
-  console.log('[ORB] Found '+Object.keys(dayMap).length+' days with ORB levels');
-  // Draw ORB levels for each day - use thicker lines
-  Object.values(dayMap).forEach(function(orb){
-    try{
-      cs.createPriceLine({price:orb.high,color:'#00d085',lineWidth:2,lineStyle:0,title:'ORB H '+orb.high});
-      cs.createPriceLine({price:orb.low,color:'#ff4560',lineWidth:2,lineStyle:0,title:'ORB L '+orb.low});
-    }catch(e){console.error('[ORB] Line error:',e);}
-  });
-  if(Object.keys(dayMap).length===0){
-    console.warn('[ORB] No ORB levels found - check if this is an Indian stock on 5min TF');
-    toast('ORB: No 9:15 candle found. Use 5M TF on Indian stocks.','warn');
+  console.log('[ORB] Found '+Object.keys(dayMap).length+' days | Drawing TODAY only');
+
+  // Only draw TODAY's ORB levels — clear previous days
+  var today=new Date().toDateString();
+  var todayORB=dayMap[today];
+
+  if(!todayORB){
+    // Market not open yet or no data — use most recent day
+    var dates=Object.keys(dayMap);
+    if(dates.length>0){
+      todayORB=dayMap[dates[dates.length-1]];
+      console.log('[ORB] Using latest day: '+dates[dates.length-1]);
+    }
   }
 
-  // Scan history for BUY/SELL signals per Pine Script logic:
-  // BUY  = close > ORB_High AND low < ORB_High (candle crossed above)
-  // SELL = close < ORB_Low  AND high > ORB_Low  (candle crossed below)
-  var markers=[];
-  var firedDays={buy:{},sell:{}};  // one signal per direction per day
+  if(todayORB){
+    try{
+      cs.createPriceLine({price:todayORB.high,color:'#00d085',lineWidth:2,lineStyle:0,title:'ORB H'});
+      cs.createPriceLine({price:todayORB.low, color:'#ff4560',lineWidth:2,lineStyle:0,title:'ORB L'});
+      console.log('[ORB] Drew H:'+todayORB.high+' L:'+todayORB.low);
+    }catch(e){console.error('[ORB] Line error:',e);}
+  } else {
+    console.warn('[ORB] No ORB levels found. Use 5M TF on Indian stocks after 9:15 IST.');
+    toast('ORB: No 9:15 candle found. Switch to 5M TF on Indian stock.','warn');
+  }
 
-  allCandles.forEach(function(c){
-    var d=new Date(c.time*1000);
+  // Scan ALL days for BUY/SELL signals (show on history)
+  // Pine Script: BUY=close>ORB_H AND low<ORB_H | SELL=close<ORB_L AND high>ORB_L
+  var markers=[];
+  var firedDays={buy:{},sell:{}};
+
+  allCandles.forEach(function(candle){
+    var d=new Date(candle.time*1000);
     var dateStr=d.toDateString();
     var orb=dayMap[dateStr];
     if(!orb)return;
 
-    var isBuy  = c.close>orb.high && c.low<orb.high;
-    var isSell = c.close<orb.low  && c.high>orb.low;
+    var isBuy  = candle.close>orb.high && candle.low<orb.high;
+    var isSell = candle.close<orb.low  && candle.high>orb.low;
 
-    // BUY signal — only first occurrence per day
     if(isBuy&&!firedDays.buy[dateStr]){
       firedDays.buy[dateStr]=true;
-      markers.push({
-        time:c.time,
-        position:'belowBar',
-        color:'#00d085',
-        shape:'arrowUp',
-        text:'ORB BUY'
-      });
-      // Draw SL/TGT for last signal
+      markers.push({time:candle.time,position:'belowBar',color:'#00d085',shape:'arrowUp',text:'ORB BUY'});
       var rp=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
       var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
-      var slD=c.close*rp/100;
-      window._lastORBSig={type:'buy',entry:c.close,sl:c.close-slD,tgt:c.close+slD*rr,rp:rp,rr:rr};
+      var slD=candle.close*rp/100;
+      window._lastORBSig={type:'buy',entry:candle.close,sl:candle.close-slD,tgt:candle.close+slD*rr,rp:rp,rr:rr};
     }
-    // SELL signal — only first occurrence per day
     if(isSell&&!firedDays.sell[dateStr]){
       firedDays.sell[dateStr]=true;
-      markers.push({
-        time:c.time,
-        position:'aboveBar',
-        color:'#ff4560',
-        shape:'arrowDown',
-        text:'ORB SELL'
-      });
-      var rp2=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
-      var rr2=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
-      var slD2=c.close*rp2/100;
-      window._lastORBSig={type:'sell',entry:c.close,sl:c.close+slD2,tgt:c.close-slD2*rr2,rp:rp2,rr:rr2};
+      markers.push({time:candle.time,position:'aboveBar',color:'#ff4560',shape:'arrowDown',text:'ORB SELL'});
+      var rp=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+      var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
+      var slD=candle.close*rp/100;
+      window._lastORBSig={type:'sell',entry:candle.close,sl:candle.close+slD,tgt:candle.close-slD*rr,rp:rp,rr:rr};
     }
   });
 

@@ -1428,10 +1428,10 @@ function onCC(){
   if(isInd&&allCandles.length){document.getElementById('apPx').value=f(allCandles[allCandles.length-1].close);}
 }
 function setAS(side){alSide=side;} // kept for compatibility
-function fetchBrokers(){
-  if(!botUrl)return;
+function fetchBrokers(cb){
+  if(!botUrl){cb&&cb();return;}
   var sel=document.getElementById('apBrk'),lbl=document.getElementById('brkL');
-  lbl.textContent='(loading...)';
+  if(lbl)lbl.textContent='(loading...)';
   Promise.all([
     fetch(botUrl+'/api/auth/status').then(function(r){return r.json();}).catch(function(){return{};})  ,
     fetch(botUrl+'/api/delta/status').then(function(r){return r.json();}).catch(function(){return{apis:[]};})
@@ -1453,7 +1453,18 @@ function openAP(px){
   document.getElementById('apTr').value='once';
   document.getElementById('apNote').value='';
   document.getElementById('apSh').checked=!!sheetUrl;
-  updateCondDD();onCC();fetchBrokers();
+  updateCondDD();onCC();
+  fetchBrokers(function(){
+    // After brokers loaded, auto-select correct one
+    var brkSel=document.getElementById('apBrk');
+    if(brkSel&&curSym){
+      if(isI(curSym)){
+        for(var i=0;i<brkSel.options.length;i++){
+          if(brkSel.options[i].value==='fyers'){brkSel.value='fyers';break;}
+        }
+      }
+    }
+  });
   document.getElementById('alpanel').classList.add('open');
 }
 function closeAP(){document.getElementById('alpanel').classList.remove('open');pendingPx=null;}
@@ -1555,12 +1566,17 @@ function confirmAl(){
 
       list.forEach(function(sym){
         // Get live price for this symbol
+        // Get price: use live data if available, else fetch from AlgoBot
         var symPrice=liveData[sym]||0;
-        if(!symPrice){
-          // Use last candle if available
-          symPrice=allCandles.length&&sym===curSym?allCandles[allCandles.length-1].close:0;
+        if(!symPrice&&sym===curSym&&allCandles.length){
+          symPrice=allCandles[allCandles.length-1].close;
         }
-        if(!symPrice)return; // skip if no price
+        // For Indian stocks not currently viewed, use AlgoBot quote
+        // Skip for now — use a default based on RR (will be refined)
+        if(!symPrice){
+          console.warn('[MASS] No price for '+sym+' — skipping');
+          return;
+        }
 
         var symQty=calcQtyFromRR(sym,symPrice);
         var broker2=isI(sym)?'fyers':'auto';
@@ -2055,6 +2071,7 @@ window.onload=function(){
 };
 </script>
 <!-- Indicator plugins — add/remove without touching chart.html -->
+<script src="alerts.js"></script>
 <script src="indicators_ema_cross.js"></script>
 <script src="indicators_candle_color.js"></script>
 <script src="indicators_orb.js"></script>

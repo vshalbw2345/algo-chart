@@ -132,9 +132,18 @@ window.AlertManager = (function(){
 
   // Fire from indicator signal
   function _checkIndicator(sym,sigType,price,candleTime){
+    // Only fire on live ticks, never on historical load
+    if(!window.isLiveUpdate){
+      console.log('[ALERT] Blocked - not live update');
+      return;
+    }
     var key=sym+'_'+sigType+'_'+candleTime;
-    if(_fired[key])return;
+    if(_fired[key]){
+      console.log('[ALERT] Blocked - duplicate key '+key);
+      return;
+    }
     _fired[key]=true;
+    console.log('[ALERT] Firing indicator alert: '+sym+' '+sigType+' @ '+price);
     var keys=Object.keys(_fired);
     if(keys.length>200)delete _fired[keys[0]];
 

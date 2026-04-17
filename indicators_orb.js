@@ -5,7 +5,7 @@
 window.INDICATORS = window.INDICATORS || {};
 
 window.INDICATORS.ORB = {
-  _state: { activeTrade:null, lastSigTime:0, priceLines:[] },
+  _state: { activeTrade:null, lastSigTime:0, lastBuyDate:null, lastSellDate:null, priceLines:[] },
   _cs: null, _chart: null,
 
   onLoad: function(chartRef, csRef, candles, sym, rr) {
@@ -33,11 +33,29 @@ window.INDICATORS.ORB = {
     var orb = this._getToday(allCandles);
     if (!orb) return null;
     var c = closed;
-    var isBuy  = c.close>orb.high && c.low<orb.high;
-    var isSell = c.close<orb.low  && c.high>orb.low;
+
+    // Pine Script exact logic:
+    // BUY  = candle CLOSES ABOVE ORB High AND candle low touched/crossed ORB High
+    // SELL = candle CLOSES BELOW ORB Low  AND candle high touched/crossed ORB Low
+    // This ensures price actually crossed the level, not just near it
+    var isBuy  = (c.close > orb.high) && (c.low  <= orb.high);
+    var isSell = (c.close < orb.low)  && (c.high >= orb.low);
+
+    // Safety: if price is above ORB High, NEVER send SELL
+    //         if price is below ORB Low,  NEVER send BUY
+    if (isBuy && isSell) { isSell = false; } // price can't do both - prioritize BUY if above high
+
     if (!isBuy && !isSell) return null;
     if (c.time === this._state.lastSigTime) return null;
+
+    // One signal per day per direction
+    var today = new Date().toDateString();
+    if (isBuy  && this._state.lastBuyDate  === today) return null;
+    if (isSell && this._state.lastSellDate === today) return null;
+
     this._state.lastSigTime = c.time;
+    if (isBuy)  this._state.lastBuyDate  = today;
+    if (isSell) this._state.lastSellDate = today;
 
     var sigType = isBuy ? 'buy' : 'sell';
     var entry = c.close;
@@ -54,7 +72,8 @@ window.INDICATORS.ORB = {
     this._addPL(sl,'#ff4560',1,2,'SL('+rp+'%)');
     this._addPL(tgt,'#00d085',1,2,'TGT(1:'+rrR+')');
 
-    console.log('[ORB] Signal: '+sigType+' @ '+entry);
+    console.log('[ORB] ✅ '+sigType.toUpperCase()+' signal @ '+entry+' | ORB H:'+orb.high+' L:'+orb.low);
+    console.log('[ORB] Candle: O:'+c.open+' H:'+c.high+' L:'+c.low+' C:'+c.close);
     return {type:sigType, price:entry, entry:entry, sl:sl, tgt:tgt, rp:rp, rr:rrR};
   },
 

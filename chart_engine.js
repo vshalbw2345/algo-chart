@@ -208,7 +208,7 @@ function tickUpdate(c){
     var prev=allCandles.length>=2?allCandles[allCandles.length-2]:null;
     allCandles.push(c);
     if(allCandles.length>2000)allCandles.shift();
-   Fire indicator checks on CLOSED candle
+    // Fire indicator checks on CLOSED candle
     // CRITICAL: Only call onCandle for indicators user ADDED in IndMgr
     // Never fire signals for indicators not explicitly added by user
     if(prev&&window.IndMgr){

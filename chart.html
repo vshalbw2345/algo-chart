@@ -463,6 +463,27 @@ var drws= ls('av_drw')   || [];
 var botUrl  = localStorage.getItem('av_bot')   || '';
 var sheetUrl= localStorage.getItem('av_sheet') || '';
 var rrCfg   = {riskPct:2,rrRatio:2,cryptoRiskPct:2,cryptoRRRatio:2};
+
+function fetchRR(){
+  if(!botUrl)return;
+  fetch(botUrl+'/api/risk/config')
+    .then(function(r){return r.json();})
+    .then(function(d){if(d.success&&d.config){rrCfg=d.config;console.log('[RR]',JSON.stringify(rrCfg));}})
+    .catch(function(){});
+}
+
+// Calculate qty matching AlgoBot Per-Stock Position Calculator
+function calcQtyFromRR(sym,price){
+  if(!price||price<=0)return 1;
+  var isInd=isI(sym);
+  var cap=rrCfg.capital||50000;
+  var lev=isInd?(rrCfg.leverage||4):(rrCfg.cryptoLeverage||10);
+  var rp=isInd?(rrCfg.riskPct||1):(rrCfg.cryptoRiskPct||0.5);
+  var effCap=cap*lev;
+  var riskAmt=effCap*rp/100;
+  var slPts=price*rp/100;
+  return Math.max(1,slPts>0?Math.floor(riskAmt/slPts):1);
+}
 var liveData={};
 
 // ════════════════════ SYMBOL DB ═════════════════════════════
@@ -1205,19 +1226,25 @@ function renderORB(ind){
     var d=new Date(c.time*1000);
     var istM=((d.getUTCHours()*60+d.getUTCMinutes())+330)%(24*60);
     var dateStr=d.toDateString();
-    // First candle of day between 9:15-9:20 IST (555-560 mins)
-    if(istM>=555&&istM<560&&!dayMap[dateStr]){
+    // First candle of day at market open (9:15 IST = 555 mins)
+    // Accept 9:00-9:20 range to handle data variations
+    if(istM>=540&&istM<=560&&!dayMap[dateStr]){
       dayMap[dateStr]={high:c.high,low:c.low,date:dateStr};
     }
   });
 
-  // Draw ORB levels for each day
+  console.log('[ORB] Found '+Object.keys(dayMap).length+' days with ORB levels');
+  // Draw ORB levels for each day - use thicker lines
   Object.values(dayMap).forEach(function(orb){
     try{
-      cs.createPriceLine({price:orb.high,color:'#00d085',lineWidth:1,lineStyle:2,title:'ORB H'});
-      cs.createPriceLine({price:orb.low,color:'#ff4560',lineWidth:1,lineStyle:2,title:'ORB L'});
-    }catch(e){}
+      cs.createPriceLine({price:orb.high,color:'#00d085',lineWidth:2,lineStyle:0,title:'ORB H '+orb.high});
+      cs.createPriceLine({price:orb.low,color:'#ff4560',lineWidth:2,lineStyle:0,title:'ORB L '+orb.low});
+    }catch(e){console.error('[ORB] Line error:',e);}
   });
+  if(Object.keys(dayMap).length===0){
+    console.warn('[ORB] No ORB levels found - check if this is an Indian stock on 5min TF');
+    toast('ORB: No 9:15 candle found. Use 5M TF on Indian stocks.','warn');
+  }
 
   // Scan history for BUY/SELL signals per Pine Script logic:
   // BUY  = close > ORB_High AND low < ORB_High (candle crossed above)
@@ -1346,7 +1373,7 @@ function getORBLevels(){
     var d=new Date(allCandles[i].time*1000);
     if(d.toDateString()!==today)continue;
     var istM=((d.getUTCHours()*60+d.getUTCMinutes())+330)%(24*60);
-    if(istM>=555&&istM<560){
+    if(istM>=540&&istM<=560){
       _orbLevelsCache.high=allCandles[i].high;
       _orbLevelsCache.low=allCandles[i].low;
       break;
@@ -1515,14 +1542,25 @@ function confirmAl(){
       window._massAlertList.forEach(function(sym){
         curSym=sym;
         // Auto-calc qty per symbol from RR
-        var cap=rrCfg.capital||50000;
-        var lev=isI(sym)?rrCfg.leverage||5:rrCfg.cryptoLeverage||10;
-        var rp3=isI(sym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
-        var effCap=cap*lev;
-        var riskAmt=effCap*rp3/100;
-        var slAmt=price*rp3/100;
-        var symQty=slAmt>0?Math.max(1,Math.floor(riskAmt/slAmt)):1;
+        // Get current market price for this symbol for accurate qty
+        var symPrice=liveData[sym]||price||0;
+        var symQty=symPrice>0?calcQtyFromRR(sym,symPrice):1;
         document.getElementById('apQty').value=symQty;
+        // Auto-select broker based on symbol type
+        var brkSel=document.getElementById('apBrk');
+        if(brkSel){
+          if(isI(sym)){
+            // Find Fyers option
+            for(var oi=0;oi<brkSel.options.length;oi++){
+              if(brkSel.options[oi].value==='fyers'){brkSel.value='fyers';break;}
+            }
+          } else {
+            // Find Delta option
+            for(var oi=0;oi<brkSel.options.length;oi++){
+              if(brkSel.options[oi].value.indexOf('delta')===0){brkSel.value=brkSel.options[oi].value;break;}
+            }
+          }
+        }
         createAll6();
         count+=6;
       });
@@ -1963,13 +2001,8 @@ window.onload=function(){
     fetchBrokerDisplay();
     syncWL1fromBot();
     setInterval(syncWL1fromBot,5000);
-    setInterval(function(){
-      if(!botUrl)return;
-      fetch(botUrl+'/api/risk/config')
-        .then(function(r){return r.json();})
-        .then(function(d){if(d.success&&d.config)rrCfg=d.config;})
-        .catch(function(){});
-    },120000);
+    fetchRR(); // fetch immediately on boot
+    setInterval(fetchRR,120000); // refresh every 2 min
   }
 
   // Wait for LightweightCharts to load

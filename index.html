@@ -1654,10 +1654,7 @@ function fetchBrokerDisplay(){
 function openMassAlert(){
   var list=curWlData();
   if(!list.length){toast('Watchlist is empty','warn');return;}
-  var conf=confirm('Create alerts for ALL '+list.length+' stocks in Watchlist '+curWL+'?
-
-This will create 6 alerts per stock ('+list.length*6+' total).
-Ensure indicator is selected and price is set.');
+    var conf=confirm('Create alerts for ALL '+list.length+' stocks in Watchlist '+curWL+'? This will create '+list.length*6+' alerts total.');
   if(!conf)return;
   openAP(); // open normal panel — user sets params once for all
   // After confirm, we'll apply to all symbols

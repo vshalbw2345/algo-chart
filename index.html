@@ -373,6 +373,7 @@ html,body{height:100%;background:#0d0f14;color:#e2e8f0;font-family:'JetBrains Mo
     <select class="ms" id="itype" style="margin-bottom:6px">
       <option value="ema_cross">EMA Crossover (9×15) — Buy/Sell Signals</option>
       <option value="candle_color">Candle Color — Green=BUY / Red=SELL</option>
+      <option value="orb">ORB — 5min Opening Range Breakout</option>
       <option value="sma">SMA</option>
       <option value="ema">EMA (single)</option>
       <option value="bb">Bollinger Bands (20,2)</option>
@@ -915,6 +916,7 @@ function tickUp(c){
     if(prevCandle){
       checkCandleColorSignal(prevCandle,closedCandle);
       checkEMACrossSignal(prevCandle,closedCandle);
+      checkORBSignal(prevCandle,closedCandle);
     }
   } else {
     // Same candle still forming — just update, no signal
@@ -969,6 +971,7 @@ function renderIndData(){
     try{
       if(ind.type==='ema_cross'){renderEMACross(ind);}
       else if(ind.type==='candle_color'){renderCandleColor(ind);}
+      else if(ind.type==='orb'){renderORB(ind);}
       else if(ind.type==='sma'||ind.type==='ema'){var s=chart.addLineSeries({color:ind.color,lineWidth:1,title:ind.name,lastValueVisible:true,priceLineVisible:false});s.setData(calcMA(allCandles,ind.period,ind.type).filter(function(v){return v.value!=null;}));indSeries[ind.id]=s;}
       else if(ind.type==='bb'){var r=calcBB(allCandles,20,2);['u','m','l'].forEach(function(k,i){var s=chart.addLineSeries({color:i===1?ind.color+'80':ind.color,lineWidth:1,lastValueVisible:false,priceLineVisible:false});s.setData([r.upper,r.mid,r.lower][i].filter(function(v){return v.value!=null;}));indSeries[ind.id+'_'+k]=s;});}
       else if(ind.type==='vwap'){var s=chart.addLineSeries({color:ind.color,lineWidth:2,title:'VWAP',lastValueVisible:true,priceLineVisible:false});s.setData(calcVWAP(allCandles).filter(function(v){return v.value!=null;}));indSeries[ind.id]=s;}
@@ -1191,6 +1194,89 @@ function checkEMACrossSignal(prevCandle,newCandle){
   });
 }
 
+// ══════════════ ORB INDICATOR ══════════════════════════
+function renderORB(ind){
+  // Uses indicators_orb.js plugin
+  if(window.INDICATORS&&window.INDICATORS.ORB){
+    window._orbInd=window.INDICATORS.ORB;
+    window._orbInd.onLoad(chart,cs,allCandles,curSym,rrCfg);
+    console.log('[ORB] Loaded from plugin');
+  } else {
+    // Fallback: draw ORB levels directly
+    computeORBLines();
+  }
+}
+
+function computeORBLines(){
+  var today=new Date().toDateString();
+  var orbH=null,orbL=null;
+  for(var i=0;i<allCandles.length;i++){
+    var d=new Date(allCandles[i].time*1000);
+    if(d.toDateString()!==today)continue;
+    var utcM=d.getUTCHours()*60+d.getUTCMinutes();
+    var istM=(utcM+330)%(24*60);
+    if(istM>=555&&istM<560){orbH=allCandles[i].high;orbL=allCandles[i].low;break;}
+  }
+  if(!orbH||!orbL)return;
+  try{
+    cs.createPriceLine({price:orbH,color:'#00d085',lineWidth:2,lineStyle:2,title:'ORB H'});
+    cs.createPriceLine({price:orbL,color:'#ff4560',lineWidth:2,lineStyle:2,title:'ORB L'});
+    console.log('[ORB] H:'+orbH+' L:'+orbL);
+  }catch(e){}
+}
+
+// ORB candle check — called from tickUp on new candle
+function checkORBSignal(prevCandle,newCandle){
+  if(!newCandle||!prevCandle)return;
+  var orbInds=inds.filter(function(i){return i.visible&&i.type==='orb';});
+  if(!orbInds.length)return;
+
+  var sig=null;
+  if(window._orbInd&&window._orbInd.onCandle){
+    sig=window._orbInd.onCandle(newCandle,[].concat(allCandles),rrCfg);
+  } else {
+    // Fallback manual ORB check
+    var levels=getORBLevels();
+    if(!levels.high||!levels.low)return;
+    var H=levels.high,L=levels.low;
+    var isBuy=newCandle.close>H&&newCandle.low<H;
+    var isSell=newCandle.close<L&&newCandle.high>L;
+    if(!isBuy&&!isSell)return;
+    var sigType=isBuy?'buy':'sell';
+    var rp=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+    var rr=isI(curSym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
+    var entry=newCandle.close;
+    var slD=entry*rp/100;
+    var sl=isBuy?entry-slD:entry+slD;
+    var tgt=isBuy?entry+slD*rr:entry-slD*rr;
+    sig={type:sigType,price:entry,entry:entry,sl:sl,tgt:tgt,rp:rp,rr:rr};
+  }
+  if(!sig)return;
+  console.log('[ORB] Signal:',sig.type,'@',sig.price);
+  window._ccSig={type:sig.type,entry:sig.entry,sl:sig.sl,tgt:sig.tgt,rp:sig.rp,rr:sig.rr};
+  orbInds.forEach(function(ind){
+    onIndicatorSignal(curSym,sig.type,sig.price,newCandle.time);
+  });
+}
+
+var _orbLevelsCache={high:null,low:null,date:null};
+function getORBLevels(){
+  var today=new Date().toDateString();
+  if(_orbLevelsCache.date===today)return _orbLevelsCache;
+  _orbLevelsCache={high:null,low:null,date:today};
+  for(var i=0;i<allCandles.length;i++){
+    var d=new Date(allCandles[i].time*1000);
+    if(d.toDateString()!==today)continue;
+    var istM=((d.getUTCHours()*60+d.getUTCMinutes())+330)%(24*60);
+    if(istM>=555&&istM<560){
+      _orbLevelsCache.high=allCandles[i].high;
+      _orbLevelsCache.low=allCandles[i].low;
+      break;
+    }
+  }
+  return _orbLevelsCache;
+}
+
 // Standalone EMA calculator (doesn't need full chart render)
 function calcEMA(candles,period){
   var r=[],ema=null,k=2/(period+1);
@@ -1270,7 +1356,18 @@ function createAll6(){
   var brkv=document.getElementById('apBrk').value;
   var tfv=document.getElementById('apTF').value;
   var tf=tfv==='same'?curTF:tfv;
-  var qty=parseInt(document.getElementById('apQty').value)||1;
+  // Auto-calc qty from RR: effectiveCapital * riskPct% / (entry * slDist%)
+  var manualQty=parseInt(document.getElementById('apQty').value)||0;
+  var qty=manualQty;
+  if(!qty||qty<1){
+    var cap=rrCfg.capital||50000;
+    var lev=isI(curSym)?rrCfg.leverage||5:rrCfg.cryptoLeverage||10;
+    var rp2=isI(curSym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+    var effCap=cap*lev;
+    var riskAmt=effCap*rp2/100;
+    var slAmt=price*rp2/100;
+    qty=slAmt>0?Math.max(1,Math.floor(riskAmt/slAmt)):1;
+  }
   var ordType=document.getElementById('apOT').value;
   var baseName=document.getElementById('apNote').value||curSym;
 
@@ -1334,17 +1431,27 @@ function confirmAl(){
 
   // If "All" selected — create all 6
   if(sigType==='all'){
-    if(window._massAlertList&&window._massAlertList.length>1){
+    if(window._massAlertList&&window._massAlertList.length>0){
       var origSym=curSym;
+      var count=0;
       window._massAlertList.forEach(function(sym){
         curSym=sym;
-        document.getElementById('apSym').textContent=sym;
+        // Auto-calc qty per symbol from RR
+        var cap=rrCfg.capital||50000;
+        var lev=isI(sym)?rrCfg.leverage||5:rrCfg.cryptoLeverage||10;
+        var rp3=isI(sym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+        var effCap=cap*lev;
+        var riskAmt=effCap*rp3/100;
+        var slAmt=price*rp3/100;
+        var symQty=slAmt>0?Math.max(1,Math.floor(riskAmt/slAmt)):1;
+        document.getElementById('apQty').value=symQty;
         createAll6();
+        count+=6;
       });
       curSym=origSym;
       window._massAlertList=null;
       closeAP();
-      toast('✅ Mass alerts created for all watchlist stocks','success');
+      toast('✅ '+count+' alerts created for all WL'+curWL+' stocks with RR qty','success');
       return;
     }
     createAll6();return;

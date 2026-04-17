@@ -892,7 +892,17 @@ function connectBinanceWS(sym,tf){
 function startLive(sym,tf){
   if(isI(sym)){
     tickInt=setInterval(function(){
-      yDirect(sym,'1m').then(function(data){if(data&&data.length){var last=data[data.length-1];tickUp(last);}}).catch(function(){});
+      if(!botUrl){setDot('orange');return;}
+      fetch(botUrl+'/api/chart/history?symbol='+encodeURIComponent(sym)+'&tf=1m')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.success&&d.candles&&d.candles.length){
+            var last=d.candles[d.candles.length-1];
+            liveData[sym]=last.close;
+            tickUp(last);
+            setDot('green');
+          }
+        }).catch(function(){setDot('red');});
     },5000);
     setDot('green');
   }else{

@@ -1221,7 +1221,7 @@ function renderORB(ind){
   if(!allCandles.length)return;
   _orbLevelsCache={high:null,low:null,date:null}; // reset cache
 
-  /Group candles by day, find first 5min candle per day = ORB range
+  // Group candles by day - find first 5min candle per day = ORB range
   var dayMap={};
   allCandles.forEach(function(candle){
     var d=new Date(candle.time*1000);

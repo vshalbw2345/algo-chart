@@ -823,30 +823,21 @@ function bnData(sym,tf){
 }
 
 function yData(sym,tf){
-  if(botUrl){
-    return fetch(botUrl+'/api/chart/history?symbol='+encodeURIComponent(sym)+'&tf='+tf)
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(d.success&&d.candles&&d.candles.length)return d.candles;
-        throw new Error(d.error||'No data from bot');
-      })
-      .catch(function(e){
-        toast('AlgoBot data failed: '+e.message+'. Using direct fetch.','warn');
-        return yDirect(sym,tf);
-      });
+  // Indian stocks MUST go through AlgoBot proxy (CORS blocks direct Yahoo)
+  if(!botUrl){
+    toast('❌ Connect AlgoBot first for Indian stock data','error');
+    return Promise.reject(new Error('AlgoBot not connected'));
   }
-  return yDirect(sym,tf);
-}
-function yDirect(sym,tf){
-  var url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval='+(YH_IV[tf]||'5m')+'&range='+(YH_RG[tf]||'5d')+'&includePrePost=false';
-  return fetch(url)
+  return fetch(botUrl+'/api/chart/history?symbol='+encodeURIComponent(sym)+'&tf='+tf,
+    {signal:AbortSignal.timeout(15000)})
     .then(function(r){return r.json();})
     .then(function(d){
-      var res=d.chart&&d.chart.result&&d.chart.result[0];
-      if(!res)throw new Error('No data — connect AlgoBot for Indian stocks');
-      var ts=res.timestamps||res.timestamp||[];
-      var q=res.indicators&&res.indicators.quote&&res.indicators.quote[0]||{};
-      return ts.map(function(t,i){return{time:t,open:q.open&&q.open[i],high:q.high&&q.high[i],low:q.low&&q.low[i],close:q.close&&q.close[i],volume:q.volume&&q.volume[i]||0};}).filter(function(c){return c.open&&c.close&&!isNaN(c.close);});
+      if(d.success&&d.candles&&d.candles.length)return d.candles;
+      throw new Error(d.error||'No data from AlgoBot');
+    })
+    .catch(function(e){
+      toast('❌ Indian stock data failed: '+e.message,'error');
+      return Promise.reject(e);
     });
 }
 
@@ -1220,16 +1211,20 @@ function renderORB(ind){
   if(!allCandles.length)return;
   _orbLevelsCache={high:null,low:null,date:null}; // reset cache
 
-  // Group candles by day, find first 5min candle per day = ORB range
+  /Group candles by day, find first 5min candle per day = ORB range
   var dayMap={};
-  allCandles.forEach(function(c){
-    var d=new Date(c.time*1000);
-    var istM=((d.getUTCHours()*60+d.getUTCMinutes())+330)%(24*60);
+  allCandles.forEach(function(candle){
+    var d=new Date(candle.time*1000);
+    var utcMins=d.getUTCHours()*60+d.getUTCMinutes();
+    var istMins=(utcMins+330)%(24*60);
+    var istH=Math.floor(istMins/60);
+    var istMn=istMins%60;
     var dateStr=d.toDateString();
-    // First candle of day at market open (9:15 IST = 555 mins)
-    // Accept 9:00-9:20 range to handle data variations
-    if(istM>=540&&istM<=560&&!dayMap[dateStr]){
-      dayMap[dateStr]={high:c.high,low:c.low,date:dateStr};
+    // IST market open: 9:15 to 9:25
+    var isOpen=(istH===9&&istMn>=15&&istMn<=25);
+    if(isOpen&&!dayMap[dateStr]){
+      dayMap[dateStr]={high:candle.high,low:candle.low,date:dateStr};
+      console.log('[ORB] Opening candle '+dateStr+' IST '+istH+':'+istMn+' H:'+candle.high+' L:'+candle.low);
     }
   });
 
@@ -1538,36 +1533,66 @@ function confirmAl(){
   if(sigType==='all'){
     if(window._massAlertList&&window._massAlertList.length>0){
       var origSym=curSym;
-      var count=0;
-      window._massAlertList.forEach(function(sym){
-        curSym=sym;
-        // Auto-calc qty per symbol from RR
-        // Get current market price for this symbol for accurate qty
-        var symPrice=liveData[sym]||price||0;
-        var symQty=symPrice>0?calcQtyFromRR(sym,symPrice):1;
-        document.getElementById('apQty').value=symQty;
-        // Auto-select broker based on symbol type
-        var brkSel=document.getElementById('apBrk');
-        if(brkSel){
-          if(isI(sym)){
-            // Find Fyers option
-            for(var oi=0;oi<brkSel.options.length;oi++){
-              if(brkSel.options[oi].value==='fyers'){brkSel.value='fyers';break;}
-            }
-          } else {
-            // Find Delta option
-            for(var oi=0;oi<brkSel.options.length;oi++){
-              if(brkSel.options[oi].value.indexOf('delta')===0){brkSel.value=brkSel.options[oi].value;break;}
-            }
-          }
-        }
-        createAll6();
-        count+=6;
-      });
-      curSym=origSym;
+      var list=window._massAlertList;
       window._massAlertList=null;
-      closeAP();
-      toast('✅ '+count+' alerts created for all WL'+curWL+' stocks with RR qty','success');
+      var tfv2=document.getElementById('apTF').value;
+      var tf2=tfv2==='same'?curTF:tfv2;
+      var ordType2=document.getElementById('apOT').value;
+      var condSrc2=document.getElementById('apCond').value;
+      var isInd2=condSrc2.indexOf('ind_')===0;
+      var created=0;
+      var now2=new Date().toISOString();
+
+      list.forEach(function(sym){
+        // Get live price for this symbol
+        var symPrice=liveData[sym]||0;
+        if(!symPrice){
+          // Use last candle if available
+          symPrice=allCandles.length&&sym===curSym?allCandles[allCandles.length-1].close:0;
+        }
+        if(!symPrice)return; // skip if no price
+
+        var symQty=calcQtyFromRR(sym,symPrice);
+        var broker2=isI(sym)?'fyers':'auto';
+        var rp4=isI(sym)?rrCfg.riskPct||1:rrCfg.cryptoRiskPct||0.5;
+        var rr4=isI(sym)?rrCfg.rrRatio||2:rrCfg.cryptoRRRatio||1.5;
+        var slD4=symPrice*rp4/100;
+        var buySL4=parseFloat((symPrice-slD4).toFixed(4));
+        var buyTGT4=parseFloat((symPrice+slD4*rr4).toFixed(4));
+        var sellSL4=parseFloat((symPrice+slD4).toFixed(4));
+        var sellTGT4=parseFloat((symPrice-slD4*rr4).toFixed(4));
+
+        var toCreate4=[
+          {type:'buy',     side:'BUY',  price:symPrice,  cond:'above', note:sym+' BUY @ '+f(symPrice)},
+          {type:'buy_sl',  side:'SELL', price:buySL4,    cond:'below', note:sym+' Buy SL @ '+f(buySL4)},
+          {type:'buy_tgt', side:'SELL', price:buyTGT4,   cond:'above', note:sym+' Buy TGT @ '+f(buyTGT4)},
+          {type:'sell',    side:'SELL', price:symPrice,  cond:'below', note:sym+' SELL @ '+f(symPrice)},
+          {type:'sell_sl', side:'BUY',  price:sellSL4,   cond:'above', note:sym+' Sell SL @ '+f(sellSL4)},
+          {type:'sell_tgt',side:'BUY',  price:sellTGT4,  cond:'below', note:sym+' Sell TGT @ '+f(sellTGT4)},
+        ];
+        toCreate4.forEach(function(at,k){
+          // Skip if exact same alert already exists
+          var exists=als.some(function(a){
+            return a.sym===sym&&a.type===at.type&&Math.abs(a.price-at.price)<0.01;
+          });
+          if(exists)return;
+          als.push({
+            id:Date.now()+created+k,sym:sym,tf:tf2,price:at.price,
+            type:at.type,side:at.side,qty:symQty,ordType:ordType2,
+            condition:at.cond,trigger:isInd2?'every':'once',
+            broker:broker2,note:at.note,logSheet:!!sheetUrl,
+            sendBot:broker2!=='none',enabled:true,
+            condSrc:isInd2?condSrc2:'price',
+            createdAt:now2,
+            meta:{sl:buySL4,tgt:buyTGT4,riskPct:rp4,rrRatio:rr4,entry:symPrice}
+          });
+          created++;
+        });
+      });
+
+      curSym=origSym;
+      ss('av_al',als);renderAlList();renderCv();closeAP();
+      toast('✅ '+created+' alerts created for '+list.length+' stocks (Fyers/RR qty)','success');
       return;
     }
     createAll6();return;

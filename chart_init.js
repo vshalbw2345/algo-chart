@@ -282,7 +282,10 @@ var AlertPanel=(function(){
         +'<button class="ib" onclick="AlertPanel.edit('+a.id+')" style="padding:1px 4px">✏</button>'
         +'<button class="ib del" onclick="AlertPanel.del('+a.id+')">✕</button>'
         +'</div></div>'
-        +'<div style="font-size:9px;color:var(--t2);margin-top:2px">'+_f(a.price)+' x'+(a.qty||1)+' · '+(a.tf||curTF).toUpperCase()+' '+(a.sendBot?'🤖':'')+' '+(a.firedAt?'<span style=\'color:var(--G)\'>✅</span>':'')+'</div>'
+        +'<div style="font-size:9px;color:var(--t2);margin-top:2px">'+_f(a.price)+' x'+(a.qty||1)+' · '+(a.tf||curTF).toUpperCase()
+        +' · '+(a.condSrc&&a.condSrc.indexOf('ind_')===0?'<span style=\'color:var(--C)\'>IND</span>':'PX')
+        +' · '+(a.trigger||'once')
+        +' '+(a.sendBot?'🤖':'')+' '+(a.firedAt?'<span style=\'color:var(--G)\'>✅</span>':'')+'</div>'
         +'</div>';
     }).join('');
   }
@@ -387,6 +390,14 @@ var AlertPanel=(function(){
       var isInd=v.indexOf('ind_')===0;
       document.getElementById('apIndSec').style.display=isInd?'block':'none';
       document.getElementById('apPxSec').style.display=isInd?'none':'block';
+      // Auto-set trigger for indicators
+      if(isInd){
+        var trSel=document.getElementById('apTr');
+        if(trSel)trSel.value='barclose';
+        // Auto-set interval to 5M for ORB
+        var tfSel=document.getElementById('apTF');
+        if(tfSel)tfSel.value='5m';
+      }
       if(isInd&&allCandles.length){
         document.getElementById('apPx').value=f(allCandles[allCandles.length-1].close);
       }
@@ -498,7 +509,8 @@ var AlertPanel=(function(){
       if(sigType==='all'){
         var brk=document.getElementById('apBrk').value;
         var tf=document.getElementById('apTF').value;if(tf==='same')tf=curTF;
-        var n=AlertManager.create6(curSym,price,brk,tf,document.getElementById('apOT').value,condSrc);
+        var trigger=document.getElementById('apTr').value||'barclose';
+        var n=AlertManager.create6(curSym,price,brk,tf,document.getElementById('apOT').value,condSrc,trigger);
         IndMgr.renderList();
         Draw.render();this.close();
         UI.refreshAlerts();
@@ -559,11 +571,37 @@ var AlertPanel=(function(){
     edit:function(id){
       var a=AlertManager.getAll().find(function(x){return x.id===id;});if(!a)return;
       this.open(a.price);
+      // Restore ALL saved fields
       document.getElementById('apPx').value=a.price;
       document.getElementById('apQty').value=a.qty||1;
       document.getElementById('apNote').value=a.note||'';
       document.getElementById('apOT').value=a.ordType||'MARKET';
       document.getElementById('apTr').value=a.trigger||'once';
+      // Restore condition (ORB/EMA/Price)
+      if(a.condSrc){
+        var condSel=document.getElementById('apCond');
+        if(condSel){
+          condSel.value=a.condSrc;
+          this.onCondChange();
+        }
+      }
+      // Restore interval/timeframe
+      if(a.tf){
+        var tfSel=document.getElementById('apTF');
+        if(tfSel)tfSel.value=a.tf;
+      }
+      // Restore broker
+      if(a.broker){
+        var brkSel=document.getElementById('apBrk');
+        if(brkSel){
+          for(var bi=0;bi<brkSel.options.length;bi++){
+            if(brkSel.options[bi].value===a.broker){brkSel.value=a.broker;break;}
+          }
+        }
+      }
+      // Restore RR qty checkbox
+      var rrCb=document.getElementById('apQtyRR');
+      if(rrCb){rrCb.checked=false;document.getElementById('apQty').readOnly=false;document.getElementById('apQty').style.opacity='1';}
       var btn=document.getElementById('apOk');
       if(btn){btn.textContent='Update Alert';btn._editId=id;}
     },

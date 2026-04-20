@@ -64,7 +64,7 @@ window.AlertManager = (function(){
   }
 
   // Create 6 alerts for one symbol
-  function _create6(sym,price,broker,tf,ordType,condSrc){
+  function _create6(sym,price,broker,tf,ordType,condSrc,trigger){
     if(!sym||!price)return 0;
     var isInd=_isI(sym);
     var rp=isInd?(_rrCfg.riskPct||1):(_rrCfg.cryptoRiskPct||0.5);
@@ -92,7 +92,7 @@ window.AlertManager = (function(){
       if(dup)return;
       _als.push({id:Date.now()+added+k,sym:sym,tf:tf||'5m',price:row.price,
         type:row.type,side:row.side,qty:qty,ordType:ordType||'MARKET',
-        condition:row.cond,trigger:isInd2?'every':'once',broker:broker||'auto',
+        condition:row.cond,trigger:trigger||(isInd2?'barclose':'once'),broker:broker||'auto',
         note:row.note,logSheet:!!_sheetUrl,sendBot:broker!=='none',enabled:true,
         condSrc:condSrc||'price',createdAt:now,meta:meta});
       added++;
@@ -216,8 +216,8 @@ window.AlertManager = (function(){
     calcQty:function(sym,price){return _calcQty(sym,price);},
     fetchBrokers:function(cb){return _fetchBrokers(cb);},
     getBrokers:function(){return _brokers;},
-    create6:function(sym,price,broker,tf,ordType,condSrc){
-      var n=_create6(sym,price,broker,tf,ordType,condSrc);
+    create6:function(sym,price,broker,tf,ordType,condSrc,trigger){
+      var n=_create6(sym,price,broker,tf,ordType,condSrc,trigger);
       if(n>0)_save();
       return n;
     },

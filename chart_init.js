@@ -324,7 +324,7 @@ var AlertPanel=(function(){
         +'<option value="above">Above</option><option value="below">Below</option><option value="cross">Cross</option>'
         +'</select></div>'
         +'<div><label style="display:block;font-size:10px;color:var(--t2);margin-bottom:3px;font-weight:600;text-transform:uppercase">Price Level</label>'
-        +'<input id="apPx" type="number" step="any" placeholder="0.00" style="width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 8px;border-radius:5px;font-family:var(--fn);font-size:11px"></div>'
+        +'<input id="apPx" type="number" step="any" placeholder="0.00" oninput="AlertPanel._autoFillQty()" style="width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 8px;border-radius:5px;font-family:var(--fn);font-size:11px"></div>'
         +'</div></div>'
 
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:6px">'
@@ -345,7 +345,12 @@ var AlertPanel=(function(){
 
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:6px">'
         +'<div><label style="display:block;font-size:10px;color:var(--t2);margin-bottom:3px;font-weight:600;text-transform:uppercase">Quantity</label>'
-        +'<input id="apQty" type="number" value="1" min="1" style="width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 8px;border-radius:5px;font-family:var(--fn);font-size:11px"></div>'
+        +'<div style="display:flex;gap:4px;align-items:center">'
+        +'<input id="apQty" type="number" value="1" min="1" style="flex:1;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 8px;border-radius:5px;font-family:var(--fn);font-size:11px">'
+        +'</div>'
+        +'<label style="display:flex;align-items:center;gap:5px;margin-top:4px;cursor:pointer;font-size:10px;color:var(--C)">'
+        +'<input type="checkbox" id="apQtyRR" checked onchange="AlertPanel.toggleRRQty()" style="width:13px;height:13px;accent-color:var(--C)">'
+        +'<span>✓ As per RR (auto from AlgoBot)</span></label></div>'
         +'<div><label style="display:block;font-size:10px;color:var(--t2);margin-bottom:3px;font-weight:600;text-transform:uppercase">Order Type</label>'
         +'<select id="apOT" style="width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--t);padding:6px 8px;border-radius:5px;font-family:var(--fn);font-size:11px">'
         +'<option value="MARKET">Market</option><option value="LIMIT">Limit</option>'
@@ -386,12 +391,56 @@ var AlertPanel=(function(){
         document.getElementById('apPx').value=f(allCandles[allCandles.length-1].close);
       }
     },
+    toggleRRQty:function(){
+      var checked=document.getElementById('apQtyRR').checked;
+      var qtyInput=document.getElementById('apQty');
+      if(checked){
+        qtyInput.readOnly=true;
+        qtyInput.style.opacity='0.6';
+        // Auto-calc from RR
+        var price=parseFloat(document.getElementById('apPx').value)||0;
+        if(!price&&allCandles.length)price=allCandles[allCandles.length-1].close;
+        if(price>0){
+          var rr=AlertManager.getRR();
+          var qty=AlertManager.calcQty(curSym,price);
+          qtyInput.value=qty;
+        }
+      } else {
+        qtyInput.readOnly=false;
+        qtyInput.style.opacity='1';
+      }
+    },
+    _autoFillQty:function(){
+      if(!document.getElementById('apQtyRR'))return;
+      if(!document.getElementById('apQtyRR').checked)return;
+      var price=parseFloat(document.getElementById('apPx').value)||0;
+      if(!price&&allCandles.length)price=allCandles[allCandles.length-1].close;
+      if(price>0){
+        var qty=AlertManager.calcQty(curSym,price);
+        document.getElementById('apQty').value=qty;
+      }
+    },
     open:function(px){
       _px=px||null;
       document.getElementById('apSym').textContent=curSym;
       if(px)document.getElementById('apPx').value=f(px);
       else if(allCandles.length)document.getElementById('apPx').value=f(allCandles[allCandles.length-1].close);
-      document.getElementById('apQty').value=1;
+      // Auto-fill qty from RR
+      var autoPrice=px||0;
+      if(!autoPrice&&allCandles.length)autoPrice=allCandles[allCandles.length-1].close;
+      if(autoPrice>0){
+        var autoQty=AlertManager.calcQty(curSym,autoPrice);
+        document.getElementById('apQty').value=autoQty;
+      } else {
+        document.getElementById('apQty').value=1;
+      }
+      // Set RR checkbox default
+      var rrCb=document.getElementById('apQtyRR');
+      if(rrCb){
+        rrCb.checked=true;
+        document.getElementById('apQty').readOnly=true;
+        document.getElementById('apQty').style.opacity='0.6';
+      }
       document.getElementById('apOT').value='MARKET';
       document.getElementById('apTF').value='same';
       document.getElementById('apTr').value='once';

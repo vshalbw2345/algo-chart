@@ -3,10 +3,11 @@
 // ═════════════════════════════════════════════════════
 
 var chart=null, cs=null, vs=null;
+var curSym='BTCUSDT';
+var curTF='5m';
 var allCandles=[];
 var liveWs=null;
 var liveData={};
-
 function f(n){
   if(n==null)return'—';
   return n>=10000?n.toFixed(2):

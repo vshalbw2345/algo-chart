@@ -1,38 +1,33 @@
-// ═════════════════════════════════════════════════════
-// CLEAN WORKING 200ms ENGINE (NO ERRORS)
-// ═════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// chart_engine.js — ORIGINAL + 200ms FAST MODE (SAFE VERSION)
+// ═══════════════════════════════════════════════════════════════
 
+// ── Global state ─────────────────────────────────────────────
 var chart=null, cs=null, vs=null;
-var curSym='BTCUSDT';
-var curTF='5m';
-var allCandles=[];
-var liveWs=null;
+var curSym='BTCUSDT', curTF='5m';
+var allCandles=[], openPrice=0;
+var liveWs=null, tickInt=null;
 var liveData={};
-function f(n){
-  if(n==null)return'—';
-  return n>=10000?n.toFixed(2):
-         n>=100?n.toFixed(2):
-         n>=1?n.toFixed(4):
-         n.toFixed(6);
-}
+var wsRetry=0, wsRetryTimer=null;
+var isLiveUpdate=false;
 
-// ── Chart ─────────────────────────
+// 🔥 FAST MODE SWITCH
+var useFastMode = true; // true = 200ms, false = normal
+
+// ── Helpers ──────────────────────────────────────────────────
+function f(n){if(n==null)return'—';return n>=10000?n.toFixed(2):n>=100?n.toFixed(2):n>=1?n.toFixed(4):n.toFixed(6);}
+
+// ── Chart ────────────────────────────────────────────────────
 var Chart={
   init:function(){
-    chart=LightweightCharts.createChart(
-      document.getElementById('chart'),
-      {
-        layout:{background:{color:'#0d0f14'},textColor:'#8892aa'}
-      }
-    );
+    chart=LightweightCharts.createChart(document.getElementById('chart'),{
+      layout:{background:{color:'#0d0f14'},textColor:'#8892aa'}
+    });
 
     cs=chart.addCandlestickSeries({
-      upColor:'#00d085',
-      downColor:'#ff4560',
-      borderUpColor:'#00d085',
-      borderDownColor:'#ff4560',
-      wickUpColor:'#00d085',
-      wickDownColor:'#ff4560'
+      upColor:'#00d085',downColor:'#ff4560',
+      borderUpColor:'#00d085',borderDownColor:'#ff4560',
+      wickUpColor:'#00d085',wickDownColor:'#ff4560',
     });
 
     vs=chart.addHistogramSeries({
@@ -42,16 +37,16 @@ var Chart={
     });
   },
 
-  load:function(sym){
+  load:function(sym,tf){
+    curSym=sym;
+    curTF=tf;
     allCandles=[];
     cs.setData([]);
-    Live.start(sym);
+    Live.start(sym,tf);
   },
 
   fit:function(){
-    if(chart){
-      chart.timeScale().fitContent();
-    }
+    if(chart) chart.timeScale().fitContent();
   },
 
   _updatePBar:function(last){
@@ -60,14 +55,31 @@ var Chart={
   }
 };
 
-// ── Live Engine (200ms) ─────────────────────────
+// ── Live Feed ────────────────────────────────────────────────
 var Live={
-  start:function(sym){
-    if(liveWs){liveWs.close();}
-    this._connect(sym);
+  start:function(sym,tf){
+    this.stop();
+
+    // ❗ Indian stocks → always normal mode
+    if(sym.includes('.NS')){
+      useFastMode=false;
+    }
+
+    if(useFastMode){
+      this._connectFast(sym);
+    }else{
+      this._connectNormal(sym,tf);
+    }
   },
 
-  _connect:function(sym){
+  stop:function(){
+    if(wsRetryTimer){clearTimeout(wsRetryTimer);wsRetryTimer=null;}
+    if(tickInt){clearInterval(tickInt);tickInt=null;}
+    if(liveWs){try{liveWs.close();}catch(e){}liveWs=null;}
+  },
+
+  // ── FAST MODE (200ms candles) ─────────────────────────────
+  _connectFast:function(sym){
 
     var url='wss://stream.binance.com:9443/ws/'+sym.toLowerCase()+'@trade';
     liveWs=new WebSocket(url);
@@ -76,15 +88,16 @@ var Live={
     let currentCandle=null;
 
     liveWs.onopen=function(){
-      console.log('WS Connected');
+      wsRetry=0;
+      console.log('⚡ FAST WS Connected');
     };
 
     liveWs.onmessage=function(e){
 
-      const t=JSON.parse(e.data);
+      const trade=JSON.parse(e.data);
 
-      const price=parseFloat(t.p);
-      const time=t.T;
+      const price=parseFloat(trade.p);
+      const time=trade.T;
 
       const bucket=Math.floor(time/INTERVAL);
       const candleTime=Math.floor((bucket*INTERVAL)/1000);
@@ -103,9 +116,7 @@ var Live={
 
         allCandles.push(currentCandle);
 
-        if(allCandles.length>2000){
-          allCandles.shift();
-        }
+        if(allCandles.length>2000) allCandles.shift();
 
       }else{
         currentCandle.high=Math.max(currentCandle.high,price);
@@ -119,19 +130,65 @@ var Live={
       vs.update({
         time:currentCandle.time,
         value:currentCandle.volume,
-        color:currentCandle.close>=currentCandle.open
-          ? '#00d08520'
-          : '#ff456020'
+        color:currentCandle.close>=currentCandle.open?'#00d08520':'#ff456020'
       });
 
       Chart._updatePBar(currentCandle);
     };
 
     liveWs.onclose=function(){
-      console.log('Reconnecting...');
-      setTimeout(()=>Live._connect(sym),2000);
+      console.log('Reconnecting FAST...');
+      setTimeout(()=>Live._connectFast(sym),2000);
+    };
+  },
+
+  // ── NORMAL MODE (original) ─────────────────────────────
+  _connectNormal:function(sym,tf){
+
+    var url='wss://stream.binance.com:9443/ws/'+sym.toLowerCase()+'@kline_'+tf;
+    liveWs=new WebSocket(url);
+
+    liveWs.onmessage=function(e){
+      var k=JSON.parse(e.data).k;
+      if(!k)return;
+
+      var c={
+        time:Math.floor(k.t/1000),
+        open:+k.o,
+        high:+k.h,
+        low:+k.l,
+        close:+k.c,
+        volume:+k.v
+      };
+
+      tickUpdate(c);
     };
   }
 };
 
-console.log('✅ 200ms Engine Ready');
+// ── Original Tick Update (unchanged) ─────────────────────────
+function tickUpdate(c){
+  if(!allCandles.length){
+    allCandles.push(c);
+  }else{
+    var last=allCandles[allCandles.length-1];
+
+    if(c.time>last.time){
+      allCandles.push(c);
+    }else{
+      allCandles[allCandles.length-1]=c;
+    }
+  }
+
+  cs.update(allCandles[allCandles.length-1]);
+
+  vs.update({
+    time:c.time,
+    value:c.volume||0,
+    color:c.close>=c.open?'#00d08520':'#ff456020'
+  });
+
+  Chart._updatePBar(c);
+}
+
+console.log('✅ Engine Loaded (Fast + Normal)');

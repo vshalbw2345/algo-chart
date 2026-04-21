@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // chart_engine.js — UPDATED FOR 200ms TICK-BASED CANDLES
 // ═══════════════════════════════════════════════════════════════
-
+var liveData = {};	
 // ── Global state ─────────────────────────────────────────────
 var chart=null, cs=null, vs=null;
 var curSym='BTCUSDT', curTF='5m';
@@ -18,35 +18,23 @@ function f(n){if(n==null)return'—';return n>=10000?n.toFixed(2):n>=100?n.toFix
 // ── Chart ────────────────────────────────────────────────────
 var Chart={
   init:function(){
-    chart=LightweightCharts.createChart(document.getElementById('chart'),{
-      layout:{background:{color:'#0d0f14'},textColor:'#8892aa'}
-    });
-
-    cs=chart.addCandlestickSeries({
-      upColor:'#00d085',downColor:'#ff4560',
-      borderUpColor:'#00d085',borderDownColor:'#ff4560',
-      wickUpColor:'#00d085',wickDownColor:'#ff4560',
-    });
-
-    vs=chart.addHistogramSeries({
-      priceFormat:{type:'volume'},
-      priceScaleId:'vol',
-      scaleMargins:{top:.85,bottom:0}
-    });
+    ...
   },
 
   load:function(sym){
-    allCandles=[];
-    cs.setData([]);
-    Live.start(sym);
+    ...
+  },
+
+  fit:function(){
+    if(chart){
+      chart.timeScale().fitContent();
+    }
   },
 
   _updatePBar:function(last){
-    if(!last)return;
-    document.getElementById('cp').textContent=f(last.close);
+    ...
   }
 };
-
 // ── Live (200ms ENGINE) ───────────────────────────────────────
 var Live={
   start:function(sym){

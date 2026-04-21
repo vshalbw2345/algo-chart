@@ -18,7 +18,7 @@ function f(n){if(n==null)return'—';return n>=10000?n.toFixed(2):n>=100?n.toFix
 // ── Chart ────────────────────────────────────────────────────
 var Chart={
   init:function(){
-    ...
+   // real code only
   },
 
   load:function(sym){

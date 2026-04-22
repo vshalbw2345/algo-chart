@@ -5,9 +5,8 @@
 
 // ── Global state ─────────────────────────────────────────────
 var chart=null, cs=null, vs=null;
-var curSym='BTCUSDT', curTF='5m';
-var allCandles=[], openPrice=0;
-var liveWs=null, tickInt=null;
+var allCandles=[];
+var liveWs=null;
 var liveData={};
 var wsRetry=0, wsRetryTimer=null;
 var isLiveUpdate=false;
